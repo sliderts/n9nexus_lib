@@ -12,13 +12,13 @@ local NineNexusLib = {
 	Flags = {},
 	Themes = {
 		Default = {
-			Main = Color3.fromRGB(22, 22, 26),
-			Second = Color3.fromRGB(28, 28, 32),
-			Stroke = Color3.fromRGB(52, 52, 58),
-			Divider = Color3.fromRGB(65, 65, 70),
-			Text = Color3.fromRGB(245, 245, 245),
-			TextDark = Color3.fromRGB(160, 160, 160),
-			Accent = Color3.fromRGB(88, 166, 255)
+			Main = Color3.fromRGB(20, 20, 25),
+			Second = Color3.fromRGB(28, 28, 35),
+			Stroke = Color3.fromRGB(55, 55, 65),
+			Divider = Color3.fromRGB(45, 45, 55),
+			Text = Color3.fromRGB(245, 245, 250),
+			TextDark = Color3.fromRGB(160, 160, 170),
+			Accent = Color3.fromRGB(88, 101, 242)
 		}
 	},
 	SelectedTheme = "Default",
@@ -26,27 +26,30 @@ local NineNexusLib = {
 	SaveCfg = false
 }
 
---Feather Icons https://github.com/evoincorp/lucideblox/tree/master/src/modules/util - Created by 7kayoh
+-- Иконки
 local Icons = {}
-
 local Success, Response = pcall(function()
 	Icons = HttpService:JSONDecode(game:HttpGetAsync("https://raw.githubusercontent.com/frappedevs/lucideblox/master/src/modules/util/icons.json")).icons
 end)
 
 if not Success then
-	warn("\nNineNexus Library - Failed to load Feather Icons. Error code: " .. Response .. "\n")
+	warn("NineNexus Library - Failed to load icons. Error: " .. Response)
 end	
 
 local function GetIcon(IconName)
-	if Icons[IconName] ~= nil then
+	if Icons[IconName] then
 		return Icons[IconName]
 	else
-		return nil
+		return "rbxassetid://3944680095"
 	end
 end   
 
+-- Создание ScreenGui
 local NineNexus = Instance.new("ScreenGui")
 NineNexus.Name = "NineNexus"
+NineNexus.ResetOnSpawn = false
+NineNexus.IgnoreGuiInset = true
+
 if syn then
 	syn.protect_gui(NineNexus)
 	NineNexus.Parent = game.CoreGui
@@ -54,6 +57,7 @@ else
 	NineNexus.Parent = gethui() or game.CoreGui
 end
 
+-- Удаление старых интерфейсов
 if gethui then
 	for _, Interface in ipairs(gethui():GetChildren()) do
 		if Interface.Name == NineNexus.Name and Interface ~= NineNexus then
@@ -77,7 +81,7 @@ function NineNexusLib:IsRunning()
 end
 
 local function AddConnection(Signal, Function)
-	if (not NineNexusLib:IsRunning()) then
+	if not NineNexusLib:IsRunning() then
 		return
 	end
 	local SignalConnect = Signal:Connect(Function)
@@ -85,80 +89,60 @@ local function AddConnection(Signal, Function)
 	return SignalConnect
 end
 
+-- Очистка соединений при закрытии
 task.spawn(function()
-	while (NineNexusLib:IsRunning()) do
+	while NineNexusLib:IsRunning() do
 		wait()
 	end
-
-	for _, Connection in next, NineNexusLib.Connections do
+	for _, Connection in pairs(NineNexusLib.Connections) do
 		Connection:Disconnect()
 	end
 end)
 
+-- Функция перетаскивания
 local function AddDraggingFunctionality(DragPoint, Main)
-	pcall(function()
-		local Dragging, DragInput, MousePos, FramePos = false
-		DragPoint.InputBegan:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-				Dragging = true
-				MousePos = Input.Position
-				FramePos = Main.Position
+	local Dragging, DragInput, MousePos, FramePos = false
+	
+	AddConnection(DragPoint.InputBegan, function(Input)
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+			Dragging = true
+			MousePos = Input.Position
+			FramePos = Main.Position
 
-				Input.Changed:Connect(function()
-					if Input.UserInputState == Enum.UserInputState.End then
-						Dragging = false
-					end
-				end)
-			end
-		end)
-		DragPoint.InputChanged:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseMovement then
-				DragInput = Input
-			end
-		end)
-		UserInputService.InputChanged:Connect(function(Input)
-			if Input == DragInput and Dragging then
-				local Delta = Input.Position - MousePos
-				TweenService:Create(Main, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position  = UDim2.new(FramePos.X.Scale,FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y)}):Play()
-			end
-		end)
+			AddConnection(Input.Changed, function()
+				if Input.UserInputState == Enum.UserInputState.End then
+					Dragging = false
+				end
+			end)
+		end
+	end)
+	
+	AddConnection(DragPoint.InputChanged, function(Input)
+		if Input.UserInputType == Enum.UserInputType.MouseMovement then
+			DragInput = Input
+		end
+	end)
+	
+	AddConnection(UserInputService.InputChanged, function(Input)
+		if Input == DragInput and Dragging then
+			local Delta = Input.Position - MousePos
+			TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				Position = UDim2.new(FramePos.X.Scale, FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y)
+			}):Play()
+		end
 	end)
 end   
 
+-- Вспомогательные функции создания элементов
 local function Create(Name, Properties, Children)
 	local Object = Instance.new(Name)
-	for i, v in next, Properties or {} do
+	for i, v in pairs(Properties or {}) do
 		Object[i] = v
 	end
-	for i, v in next, Children or {} do
+	for i, v in pairs(Children or {}) do
 		v.Parent = Object
 	end
 	return Object
-end
-
-local function CreateElement(ElementName, ElementFunction)
-	NineNexusLib.Elements[ElementName] = function(...)
-		return ElementFunction(...)
-	end
-end
-
-local function MakeElement(ElementName, ...)
-	local NewElement = NineNexusLib.Elements[ElementName](...)
-	return NewElement
-end
-
-local function SetProps(Element, Props)
-	table.foreach(Props, function(Property, Value)
-		Element[Property] = Value
-	end)
-	return Element
-end
-
-local function SetChildren(Element, Children)
-	table.foreach(Children, function(_, Child)
-		Child.Parent = Element
-	end)
-	return Element
 end
 
 local function Round(Number, Factor)
@@ -170,17 +154,13 @@ end
 local function ReturnProperty(Object)
 	if Object:IsA("Frame") or Object:IsA("TextButton") then
 		return "BackgroundColor3"
-	end 
-	if Object:IsA("ScrollingFrame") then
+	elseif Object:IsA("ScrollingFrame") then
 		return "ScrollBarImageColor3"
-	end 
-	if Object:IsA("UIStroke") then
+	elseif Object:IsA("UIStroke") then
 		return "Color"
-	end 
-	if Object:IsA("TextLabel") or Object:IsA("TextBox") then
+	elseif Object:IsA("TextLabel") or Object:IsA("TextBox") then
 		return "TextColor3"
-	end   
-	if Object:IsA("ImageLabel") or Object:IsA("ImageButton") then
+	elseif Object:IsA("ImageLabel") or Object:IsA("ImageButton") then
 		return "ImageColor3"
 	end   
 end
@@ -194,296 +174,124 @@ local function AddThemeObject(Object, Type)
 	return Object
 end    
 
-local function SetTheme()
-	for Name, Type in pairs(NineNexusLib.ThemeObjects) do
-		for _, Object in pairs(Type) do
-			Object[ReturnProperty(Object)] = NineNexusLib.Themes[NineNexusLib.SelectedTheme][Name]
-		end    
-	end    
-end
-
-local function PackColor(Color)
-	return {R = Color.R * 255, G = Color.G * 255, B = Color.B * 255}
-end    
-
-local function UnpackColor(Color)
-	return Color3.fromRGB(Color.R, Color.G, Color.B)
-end
-
-local function LoadCfg(Config)
-	local Data = HttpService:JSONDecode(Config)
-	table.foreach(Data, function(a,b)
-		if NineNexusLib.Flags[a] then
-			spawn(function() 
-				if NineNexusLib.Flags[a].Type == "Colorpicker" then
-					NineNexusLib.Flags[a]:Set(UnpackColor(b))
-				else
-					NineNexusLib.Flags[a]:Set(b)
-				end    
-			end)
-		else
-			warn("NineNexus Library Config Loader - Could not find ", a ,b)
-		end
-	end)
-end
-
-local function SaveCfg(Name)
-	local Data = {}
-	for i,v in pairs(NineNexusLib.Flags) do
-		if v.Save then
-			if v.Type == "Colorpicker" then
-				Data[i] = PackColor(v.Value)
-			else
-				Data[i] = v.Value
-			end
-		end	
-	end
-	writefile(NineNexusLib.Folder .. "/" .. Name .. ".txt", tostring(HttpService:JSONEncode(Data)))
-end
-
-local WhitelistedMouse = {Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3}
-local BlacklistedKeys = {Enum.KeyCode.Unknown,Enum.KeyCode.W,Enum.KeyCode.A,Enum.KeyCode.S,Enum.KeyCode.D,Enum.KeyCode.Up,Enum.KeyCode.Left,Enum.KeyCode.Down,Enum.KeyCode.Right,Enum.KeyCode.Slash,Enum.KeyCode.Tab,Enum.KeyCode.Backspace,Enum.KeyCode.Escape}
-
-local function CheckKey(Table, Key)
-	for _, v in next, Table do
-		if v == Key then
-			return true
-		end
-	end
-end
-
-CreateElement("Corner", function(Scale, Offset)
-	local Corner = Create("UICorner", {
-		CornerRadius = UDim.new(Scale or 0, Offset or 12)
-	})
-	return Corner
-end)
-
-CreateElement("Stroke", function(Color, Thickness)
-	local Stroke = Create("UIStroke", {
-		Color = Color or Color3.fromRGB(255, 255, 255),
-		Thickness = Thickness or 1.2
-	})
-	return Stroke
-end)
-
-CreateElement("List", function(Scale, Offset)
-	local List = Create("UIListLayout", {
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(Scale or 0, Offset or 0)
-	})
-	return List
-end)
-
-CreateElement("Padding", function(Bottom, Left, Right, Top)
-	local Padding = Create("UIPadding", {
-		PaddingBottom = UDim.new(0, Bottom or 6),
-		PaddingLeft = UDim.new(0, Left or 6),
-		PaddingRight = UDim.new(0, Right or 6),
-		PaddingTop = UDim.new(0, Top or 6)
-	})
-	return Padding
-end)
-
-CreateElement("TFrame", function()
-	local TFrame = Create("Frame", {
-		BackgroundTransparency = 1
-	})
-	return TFrame
-end)
-
-CreateElement("Frame", function(Color)
-	local Frame = Create("Frame", {
-		BackgroundColor3 = Color or Color3.fromRGB(255, 255, 255),
-		BorderSizePixel = 0
-	})
-	return Frame
-end)
-
-CreateElement("RoundFrame", function(Color, Scale, Offset)
-	local Frame = Create("Frame", {
-		BackgroundColor3 = Color or Color3.fromRGB(255, 255, 255),
-		BorderSizePixel = 0
-	}, {
-		Create("UICorner", {
-			CornerRadius = UDim.new(Scale, Offset)
-		})
-	})
-	return Frame
-end)
-
-CreateElement("Button", function()
-	local Button = Create("TextButton", {
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0
-	})
-	return Button
-end)
-
-CreateElement("ScrollFrame", function(Color, Width)
-	local ScrollFrame = Create("ScrollingFrame", {
-		BackgroundTransparency = 1,
-		MidImage = "rbxassetid://7445543667",
-		BottomImage = "rbxassetid://7445543667",
-		TopImage = "rbxassetid://7445543667",
-		ScrollBarImageColor3 = Color,
-		BorderSizePixel = 0,
-		ScrollBarThickness = Width,
-		CanvasSize = UDim2.new(0, 0, 0, 0)
-	})
-	return ScrollFrame
-end)
-
-CreateElement("Image", function(ImageID)
-	local ImageNew = Create("ImageLabel", {
-		Image = ImageID,
-		BackgroundTransparency = 1
-	})
-
-	if GetIcon(ImageID) ~= nil then
-		ImageNew.Image = GetIcon(ImageID)
-	end	
-
-	return ImageNew
-end)
-
-CreateElement("ImageButton", function(ImageID)
-	local Image = Create("ImageButton", {
-		Image = ImageID,
-		BackgroundTransparency = 1
-	})
-	return Image
-end)
-
-CreateElement("Label", function(Text, TextSize, Transparency)
-	local Label = Create("TextLabel", {
-		Text = Text or "",
-		TextColor3 = Color3.fromRGB(245, 245, 245),
-		TextTransparency = Transparency or 0,
-		TextSize = TextSize or 16,
-		Font = Enum.Font.GothamMedium,
-		RichText = true,
-		BackgroundTransparency = 1,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Center
-	})
-	return Label
-end)
-
-local NotificationHolder = SetProps(SetChildren(MakeElement("TFrame"), {
-	SetProps(MakeElement("List"), {
+-- Контейнер для уведомлений
+local NotificationHolder = Create("Frame", {
+	Name = "NotificationHolder",
+	Position = UDim2.new(1, -320, 1, -20),
+	Size = UDim2.new(0, 300, 1, -20),
+	AnchorPoint = Vector2.new(1, 1),
+	BackgroundTransparency = 1,
+	Parent = NineNexus
+}, {
+	Create("UIListLayout", {
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
 		Padding = UDim.new(0, 8)
 	})
-}), {
-	Position = UDim2.new(1, -30, 1, -30),
-	Size = UDim2.new(0, 350, 1, -30),
-	AnchorPoint = Vector2.new(1, 1),
-	Parent = NineNexus
 })
 
+-- Функция уведомлений с прогресс-баром
 function NineNexusLib:MakeNotification(NotificationConfig)
 	spawn(function()
 		NotificationConfig.Name = NotificationConfig.Name or "NineNexus"
-		NotificationConfig.Content = NotificationConfig.Content or "Notification content"
+		NotificationConfig.Content = NotificationConfig.Content or "Notification"
 		NotificationConfig.Image = NotificationConfig.Image or "bell"
-		NotificationConfig.Time = NotificationConfig.Time or 8
+		NotificationConfig.Time = NotificationConfig.Time or 5
 
-		local NotificationParent = SetProps(MakeElement("TFrame"), {
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			Parent = NotificationHolder
-		})
-
-		-- Прогресс бар для уведомления
-		local ProgressBar = SetProps(MakeElement("Frame", Color3.fromRGB(88, 166, 255)), {
-			Size = UDim2.new(1, 0, 0, 3),
-			Position = UDim2.new(0, 0, 1, -3),
-			BorderSizePixel = 0
-		})
-
-		local NotificationFrame = SetChildren(SetProps(MakeElement("RoundFrame", NineNexusLib.Themes.Default.Second, 0, 12), {
-			Parent = NotificationParent, 
-			Size = UDim2.new(1, 0, 0, 0),
+		local NotificationFrame = Create("Frame", {
+			Size = UDim2.new(1, 0, 0, 80),
 			Position = UDim2.new(1, 50, 0, 0),
-			BackgroundTransparency = 0,
-			AutomaticSize = Enum.AutomaticSize.Y
-		}), {
-			MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5),
-			MakeElement("Padding", 16, 16, 16, 16),
-			SetProps(MakeElement("Image", GetIcon(NotificationConfig.Image) or "rbxassetid://7072718307"), {
+			BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+			BorderSizePixel = 0,
+			Parent = NotificationHolder
+		}, {
+			Create("UICorner", {CornerRadius = UDim.new(0, 12)}),
+			Create("UIStroke", {
+				Color = NineNexusLib.Themes.Default.Stroke,
+				Thickness = 1.5
+			}),
+			Create("UIPadding", {
+				PaddingLeft = UDim.new(0, 16),
+				PaddingRight = UDim.new(0, 16),
+				PaddingTop = UDim.new(0, 12),
+				PaddingBottom = UDim.new(0, 12)
+			}),
+			Create("ImageLabel", {
+				Name = "Icon",
 				Size = UDim2.new(0, 24, 0, 24),
-				ImageColor3 = NineNexusLib.Themes.Default.Accent,
-				Name = "Icon"
+				Position = UDim2.new(0, 0, 0, 0),
+				BackgroundTransparency = 1,
+				Image = GetIcon(NotificationConfig.Image),
+				ImageColor3 = NineNexusLib.Themes.Default.Accent
 			}),
-			SetProps(MakeElement("Label", NotificationConfig.Name, 16), {
-				Size = UDim2.new(1, -40, 0, 24),
-				Position = UDim2.new(0, 40, 0, 0),
-				Font = Enum.Font.GothamBold,
+			Create("TextLabel", {
 				Name = "Title",
-				TextColor3 = NineNexusLib.Themes.Default.Text
-			}),
-			SetProps(MakeElement("Label", NotificationConfig.Content, 14), {
-				Size = UDim2.new(1, -8, 0, 0),
-				Position = UDim2.new(0, 4, 0, 32),
-				Font = Enum.Font.GothamMedium,
-				Name = "Content",
-				AutomaticSize = Enum.AutomaticSize.Y,
-				TextColor3 = NineNexusLib.Themes.Default.TextDark,
-				TextWrapped = true,
+				Size = UDim2.new(1, -35, 0, 20),
+				Position = UDim2.new(0, 35, 0, 0),
+				BackgroundTransparency = 1,
+				Text = NotificationConfig.Name,
+				TextColor3 = NineNexusLib.Themes.Default.Text,
+				TextSize = 16,
+				Font = Enum.Font.GothamBold,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
-			ProgressBar
+			Create("TextLabel", {
+				Name = "Content",
+				Size = UDim2.new(1, -35, 0, 16),
+				Position = UDim2.new(0, 35, 0, 22),
+				BackgroundTransparency = 1,
+				Text = NotificationConfig.Content,
+				TextColor3 = NineNexusLib.Themes.Default.TextDark,
+				TextSize = 14,
+				Font = Enum.Font.Gotham,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextWrapped = true
+			}),
+			Create("Frame", {
+				Name = "ProgressBar",
+				Size = UDim2.new(1, 0, 0, 3),
+				Position = UDim2.new(0, 0, 1, -3),
+				BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+				BorderSizePixel = 0
+			}, {
+				Create("UICorner", {CornerRadius = UDim.new(0, 2)}),
+				Create("Frame", {
+					Name = "Fill",
+					Size = UDim2.new(1, 0, 1, 0),
+					BackgroundColor3 = NineNexusLib.Themes.Default.Accent,
+					BorderSizePixel = 0
+				}, {
+					Create("UICorner", {CornerRadius = UDim.new(0, 2)})
+				})
+			})
 		})
 
 		-- Анимация появления
-		TweenService:Create(NotificationFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
+		TweenService:Create(NotificationFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0, 0, 0, 0)
+		}):Play()
 
-		-- Анимация прогресс бара
-		TweenService:Create(ProgressBar, TweenInfo.new(NotificationConfig.Time, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 3)}):Play()
+		-- Анимация прогресс-бара
+		TweenService:Create(NotificationFrame.ProgressBar.Fill, TweenInfo.new(NotificationConfig.Time, Enum.EasingStyle.Linear), {
+			Size = UDim2.new(0, 0, 1, 0)
+		}):Play()
 
-		-- Исчезновение
-		wait(NotificationConfig.Time - 0.6)
-		
-		TweenService:Create(NotificationFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+		-- Удаление уведомления
+		wait(NotificationConfig.Time)
+		TweenService:Create(NotificationFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
 			Position = UDim2.new(1, 50, 0, 0),
 			BackgroundTransparency = 1
 		}):Play()
-		
-		TweenService:Create(NotificationFrame.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Transparency = 1}):Play()
-		TweenService:Create(NotificationFrame.Icon, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {ImageTransparency = 1}):Play()
-		TweenService:Create(NotificationFrame.Title, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {TextTransparency = 1}):Play()
-		TweenService:Create(NotificationFrame.Content, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {TextTransparency = 1}):Play()
-		
-		wait(0.6)
+		wait(0.3)
 		NotificationFrame:Destroy()
 	end)
 end    
 
-function NineNexusLib:Init()
-	if NineNexusLib.SaveCfg then	
-		pcall(function()
-			if isfile(NineNexusLib.Folder .. "/" .. game.GameId .. ".txt") then
-				LoadCfg(readfile(NineNexusLib.Folder .. "/" .. game.GameId .. ".txt"))
-				NineNexusLib:MakeNotification({
-					Name = "Configuration Loaded",
-					Content = "Auto-loaded configuration for game " .. game.GameId .. ".",
-					Image = "settings",
-					Time = 6
-				})
-			end
-		end)		
-	end	
-end	
-
+-- Основная функция создания окна
 function NineNexusLib:MakeWindow(WindowConfig)
 	local FirstTab = true
 	local Minimized = false
-	local Loaded = false
 	local UIHidden = false
 
 	WindowConfig = WindowConfig or {}
@@ -491,14 +299,12 @@ function NineNexusLib:MakeWindow(WindowConfig)
 	WindowConfig.ConfigFolder = WindowConfig.ConfigFolder or WindowConfig.Name
 	WindowConfig.SaveConfig = WindowConfig.SaveConfig or false
 	WindowConfig.HidePremium = WindowConfig.HidePremium or false
-	if WindowConfig.IntroEnabled == nil then
-		WindowConfig.IntroEnabled = true
-	end
+	WindowConfig.IntroEnabled = WindowConfig.IntroEnabled ~= false
 	WindowConfig.IntroText = WindowConfig.IntroText or "NineNexus"
 	WindowConfig.CloseCallback = WindowConfig.CloseCallback or function() end
 	WindowConfig.ShowIcon = WindowConfig.ShowIcon or false
-	WindowConfig.Icon = WindowConfig.Icon or GetIcon("zap") or "rbxassetid://7072718307"
-	WindowConfig.IntroIcon = WindowConfig.IntroIcon or GetIcon("zap") or "rbxassetid://7072718307"
+	WindowConfig.Icon = WindowConfig.Icon or "home"
+
 	NineNexusLib.Folder = WindowConfig.ConfigFolder
 	NineNexusLib.SaveCfg = WindowConfig.SaveConfig
 
@@ -508,1260 +314,893 @@ function NineNexusLib:MakeWindow(WindowConfig)
 		end	
 	end
 
-	local TabHolder = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", NineNexusLib.Themes.Default.Divider, 6), {
-		Size = UDim2.new(1, 0, 1, -60)
-	}), {
-		MakeElement("List", 0, 4),
-		MakeElement("Padding", 12, 8, 8, 12)
-	}), "Divider")
+	-- Создание главного окна
+	local MainWindow = Create("Frame", {
+		Name = "MainWindow",
+		Position = UDim2.new(0.5, -400, 0.5, -250),
+		Size = UDim2.new(0, 800, 0, 500),
+		BackgroundColor3 = NineNexusLib.Themes.Default.Main,
+		BorderSizePixel = 0,
+		Parent = NineNexus
+	}, {
+		Create("UICorner", {CornerRadius = UDim.new(0, 12)}),
+		Create("UIStroke", {
+			Color = NineNexusLib.Themes.Default.Stroke,
+			Thickness = 2
+		})
+	})
 
-	AddConnection(TabHolder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
-		TabHolder.CanvasSize = UDim2.new(0, 0, 0, TabHolder.UIListLayout.AbsoluteContentSize.Y + 24)
+	-- Заголовок окна
+	local TopBar = Create("Frame", {
+		Name = "TopBar",
+		Size = UDim2.new(1, 0, 0, 50),
+		BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+		BorderSizePixel = 0,
+		Parent = MainWindow
+	}, {
+		Create("UICorner", {CornerRadius = UDim.new(0, 12)}),
+		Create("Frame", {
+			Size = UDim2.new(1, 0, 0, 25),
+			Position = UDim2.new(0, 0, 1, -25),
+			BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+			BorderSizePixel = 0
+		}),
+		Create("Frame", {
+			Size = UDim2.new(1, 0, 0, 1),
+			Position = UDim2.new(0, 0, 1, -1),
+			BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+			BorderSizePixel = 0
+		})
+	})
+
+	-- Название окна
+	local WindowTitle = Create("TextLabel", {
+		Name = "Title",
+		Size = UDim2.new(1, -120, 1, 0),
+		Position = UDim2.new(0, 20, 0, 0),
+		BackgroundTransparency = 1,
+		Text = WindowConfig.Name,
+		TextColor3 = NineNexusLib.Themes.Default.Text,
+		TextSize = 18,
+		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = TopBar
+	})
+
+	-- Кнопки управления
+	local ControlButtons = Create("Frame", {
+		Name = "Controls",
+		Size = UDim2.new(0, 80, 0, 30),
+		Position = UDim2.new(1, -90, 0, 10),
+		BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+		BorderSizePixel = 0,
+		Parent = TopBar
+	}, {
+		Create("UICorner", {CornerRadius = UDim.new(0, 8)})
+	})
+
+	local MinimizeBtn = Create("TextButton", {
+		Name = "Minimize",
+		Size = UDim2.new(0.5, -1, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		Parent = ControlButtons
+	}, {
+		Create("ImageLabel", {
+			Size = UDim2.new(0, 16, 0, 16),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = GetIcon("minus"),
+			ImageColor3 = NineNexusLib.Themes.Default.Text
+		})
+	})
+
+	local CloseBtn = Create("TextButton", {
+		Name = "Close",
+		Size = UDim2.new(0.5, -1, 1, 0),
+		Position = UDim2.new(0.5, 1, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		Parent = ControlButtons
+	}, {
+		Create("ImageLabel", {
+			Size = UDim2.new(0, 16, 0, 16),
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = GetIcon("x"),
+			ImageColor3 = NineNexusLib.Themes.Default.Text
+		})
+	})
+
+	-- Разделитель между кнопками
+	Create("Frame", {
+		Size = UDim2.new(0, 1, 0, 20),
+		Position = UDim2.new(0.5, 0, 0, 5),
+		BackgroundColor3 = NineNexusLib.Themes.Default.Main,
+		BorderSizePixel = 0,
+		Parent = ControlButtons
+	})
+
+	-- Боковая панель с табами
+	local SideBar = Create("Frame", {
+		Name = "SideBar",
+		Size = UDim2.new(0, 200, 1, -50),
+		Position = UDim2.new(0, 0, 0, 50),
+		BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+		BorderSizePixel = 0,
+		Parent = MainWindow
+	}, {
+		Create("Frame", {
+			Size = UDim2.new(0, 1, 1, 0),
+			Position = UDim2.new(1, -1, 0, 0),
+			BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+			BorderSizePixel = 0
+		})
+	})
+
+	-- Контейнер для табов
+	local TabContainer = Create("ScrollingFrame", {
+		Name = "TabContainer",
+		Size = UDim2.new(1, 0, 1, -60),
+		Position = UDim2.new(0, 0, 0, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = NineNexusLib.Themes.Default.Stroke,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		Parent = SideBar
+	}, {
+		Create("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 4)
+		}),
+		Create("UIPadding", {
+			PaddingLeft = UDim.new(0, 8),
+			PaddingRight = UDim.new(0, 8),
+			PaddingTop = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 8)
+		})
+	})
+
+	-- Обновление размера канваса для табов
+	AddConnection(TabContainer.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+		TabContainer.CanvasSize = UDim2.new(0, 0, 0, TabContainer.UIListLayout.AbsoluteContentSize.Y + 20)
 	end)
 
-	local CloseBtn = SetChildren(SetProps(MakeElement("Button"), {
-		Size = UDim2.new(0.5, 0, 1, 0),
-		Position = UDim2.new(0.5, 0, 0, 0),
-		BackgroundTransparency = 1
-	}), {
-		AddThemeObject(SetProps(MakeElement("Image", GetIcon("x") or "rbxassetid://7072725342"), {
-			Position = UDim2.new(0.5, -9, 0.5, -9),
-			Size = UDim2.new(0, 18, 0, 18),
-			AnchorPoint = Vector2.new(0.5, 0.5)
-		}), "Text")
-	})
-
-	local MinimizeBtn = SetChildren(SetProps(MakeElement("Button"), {
-		Size = UDim2.new(0.5, 0, 1, 0),
-		BackgroundTransparency = 1
-	}), {
-		AddThemeObject(SetProps(MakeElement("Image", GetIcon("minus") or "rbxassetid://7072719338"), {
-			Position = UDim2.new(0.5, -9, 0.5, -9),
-			Size = UDim2.new(0, 18, 0, 18),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Name = "Ico"
-		}), "Text")
-	})
-
-	local DragPoint = SetProps(MakeElement("TFrame"), {
-		Size = UDim2.new(1, 0, 0, 55)
-	})
-
-	-- Улучшенная аватарка пользователя
-	local function GetUserAvatar()
-		local success, avatarUrl = pcall(function()
-			return game:GetService("Players"):GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-		end)
-		return success and avatarUrl or "rbxassetid://7072718307"
-	end
-
-	local WindowStuff = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
-		Size = UDim2.new(0, 165, 1, -55),
-		Position = UDim2.new(0, 0, 0, 55)
-	}), {
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(1, 0, 0, 12),
-			Position = UDim2.new(0, 0, 0, 0)
-		}), "Second"), 
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(0, 12, 1, 0),
-			Position = UDim2.new(1, -12, 0, 0)
-		}), "Second"), 
-		AddThemeObject(SetProps(MakeElement("Frame"), {
-			Size = UDim2.new(0, 1.5, 1, 0),
-			Position = UDim2.new(1, -1.5, 0, 0)
-		}), "Stroke"), 
-		TabHolder,
-		SetChildren(SetProps(MakeElement("TFrame"), {
-			Size = UDim2.new(1, 0, 0, 60),
-			Position = UDim2.new(0, 0, 1, -60)
-		}), {
-			AddThemeObject(SetProps(MakeElement("Frame"), {
-				Size = UDim2.new(1, 0, 0, 1.5)
-			}), "Stroke"), 
-			AddThemeObject(SetChildren(SetProps(MakeElement("Frame"), {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Size = UDim2.new(0, 36, 0, 36),
-				Position = UDim2.new(0, 12, 0.5, 0)
-			}), {
-				SetProps(MakeElement("Image", GetUserAvatar()), {
-					Size = UDim2.new(1, 0, 1, 0),
-					Name = "Avatar"
-				}),
-				MakeElement("Corner", 1)
-			}), "Divider"),
-			SetChildren(SetProps(MakeElement("TFrame"), {
-				AnchorPoint = Vector2.new(0, 0.5),
-				Size = UDim2.new(0, 36, 0, 36),
-				Position = UDim2.new(0, 12, 0.5, 0)
-			}), {
-				AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-				MakeElement("Corner", 1)
-			}),
-			AddThemeObject(SetProps(MakeElement("Label", LocalPlayer.DisplayName, WindowConfig.HidePremium and 15 or 14), {
-				Size = UDim2.new(1, -60, 0, 16),
-				Position = WindowConfig.HidePremium and UDim2.new(0, 56, 0, 22) or UDim2.new(0, 56, 0, 18),
-				Font = Enum.Font.GothamBold,
-				ClipsDescendants = true,
-				TextColor3 = NineNexusLib.Themes.Default.Text
-			}), "Text"),
-			AddThemeObject(SetProps(MakeElement("Label", "@" .. LocalPlayer.Name, 12), {
-				Size = UDim2.new(1, -60, 0, 14),
-				Position = UDim2.new(0, 56, 1, -32),
-				Visible = not WindowConfig.HidePremium,
-				ClipsDescendants = true,
-				TextColor3 = NineNexusLib.Themes.Default.TextDark
-			}), "TextDark")
-		}),
-	}), "Second")
-
-	local WindowName = AddThemeObject(SetProps(MakeElement("Label", WindowConfig.Name, 18), {
-		Size = UDim2.new(1, -100, 1, 0),
-		Position = UDim2.new(0, 20, 0, 0),
-		Font = Enum.Font.GothamBold,
-		TextYAlignment = Enum.TextYAlignment.Center
-	}), "Text")
-
-	local WindowTopBarLine = AddThemeObject(SetProps(MakeElement("Frame"), {
-		Size = UDim2.new(1, 0, 0, 1.5),
-		Position = UDim2.new(0, 0, 1, -1.5)
-	}), "Stroke")
-
-	local MainWindow = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
-		Parent = NineNexus,
-		Position = UDim2.new(0.5, -325, 0.5, -190),
-		Size = UDim2.new(0, 650, 0, 380),
-		ClipsDescendants = true
-	}), {
-		SetChildren(SetProps(MakeElement("TFrame"), {
-			Size = UDim2.new(1, 0, 0, 55),
-			Name = "TopBar"
-		}), {
-			WindowName,
-			WindowTopBarLine,
-			AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-				Size = UDim2.new(0, 75, 0, 35),
-				Position = UDim2.new(1, -95, 0, 10)
-			}), {
-				AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-				AddThemeObject(SetProps(MakeElement("Frame"), {
-					Size = UDim2.new(0, 1.5, 1, 0),
-					Position = UDim2.new(0.5, 0, 0, 0)
-				}), "Stroke"), 
-				CloseBtn,
-				MinimizeBtn
-			}), "Second"), 
-		}),
-		DragPoint,
-		WindowStuff
-	}), "Main")
-
-	if WindowConfig.ShowIcon then
-		WindowName.Position = UDim2.new(0, 55, 0, 0)
-		local WindowIcon = SetProps(MakeElement("Image", WindowConfig.Icon), {
-			Size = UDim2.new(0, 24, 0, 24),
-			Position = UDim2.new(0, 20, 0, 15.5),
-			ImageColor3 = NineNexusLib.Themes.Default.Accent
+	-- Информация о пользователе
+	local UserInfo = Create("Frame", {
+		Name = "UserInfo",
+		Size = UDim2.new(1, 0, 0, 60),
+		Position = UDim2.new(0, 0, 1, -60),
+		BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+		BorderSizePixel = 0,
+		Parent = SideBar
+	}, {
+		Create("Frame", {
+			Size = UDim2.new(1, 0, 0, 1),
+			BackgroundColor3 = NineNexusLib.Themes.Default.Divider,
+			BorderSizePixel = 0
 		})
-		WindowIcon.Parent = MainWindow.TopBar
-	end	
+	})
 
-	AddDraggingFunctionality(DragPoint, MainWindow)
+	-- Аватар пользователя с правильным API
+	local UserAvatar = Create("Frame", {
+		Name = "Avatar",
+		Size = UDim2.new(0, 36, 0, 36),
+		Position = UDim2.new(0, 12, 0, 12),
+		BackgroundTransparency = 1,
+		Parent = UserInfo
+	}, {
+		Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
+		Create("ImageLabel", {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundTransparency = 1,
+			Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LocalPlayer.UserId .. "&width=150&height=150&format=png",
+			ScaleType = Enum.ScaleType.Crop
+		}, {
+			Create("UICorner", {CornerRadius = UDim.new(1, 0)})
+		}),
+		Create("UIStroke", {
+			Color = NineNexusLib.Themes.Default.Accent,
+			Thickness = 2
+		})
+	})
 
-	AddConnection(CloseBtn.MouseButton1Up, function()
+	-- Имя пользователя
+	Create("TextLabel", {
+		Name = "Username",
+		Size = UDim2.new(1, -60, 0, 18),
+		Position = UDim2.new(0, 55, 0, 12),
+		BackgroundTransparency = 1,
+		Text = LocalPlayer.DisplayName,
+		TextColor3 = NineNexusLib.Themes.Default.Text,
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = UserInfo
+	})
+
+	Create("TextLabel", {
+		Name = "UserTag",
+		Size = UDim2.new(1, -60, 0, 14),
+		Position = UDim2.new(0, 55, 0, 30),
+		BackgroundTransparency = 1,
+		Text = "@" .. LocalPlayer.Name,
+		TextColor3 = NineNexusLib.Themes.Default.TextDark,
+		TextSize = 12,
+		Font = Enum.Font.Gotham,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = UserInfo
+	})
+
+	-- Основной контент
+	local ContentArea = Create("Frame", {
+		Name = "ContentArea",
+		Size = UDim2.new(1, -200, 1, -50),
+		Position = UDim2.new(0, 200, 0, 50),
+		BackgroundTransparency = 1,
+		Parent = MainWindow
+	})
+
+	-- Функции кнопок управления
+	AddConnection(CloseBtn.MouseButton1Click, function()
 		MainWindow.Visible = false
 		UIHidden = true
 		NineNexusLib:MakeNotification({
 			Name = "Interface Hidden",
-			Content = "Press RightShift to reopen the interface",
+			Content = "Press Insert to show interface",
 			Image = "eye-off",
-			Time = 6
+			Time = 3
 		})
 		WindowConfig.CloseCallback()
 	end)
 
-	AddConnection(UserInputService.InputBegan, function(Input)
-		if Input.KeyCode == Enum.KeyCode.RightShift and UIHidden then
-			MainWindow.Visible = true
-			UIHidden = false
-		end
-	end)
-
-	AddConnection(MinimizeBtn.MouseButton1Up, function()
+	AddConnection(MinimizeBtn.MouseButton1Click, function()
 		if Minimized then
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 650, 0, 380)}):Play()
-			MinimizeBtn.Ico.Image = GetIcon("minus") or "rbxassetid://7072719338"
-			wait(.02)
-			MainWindow.ClipsDescendants = false
-			WindowStuff.Visible = true
-			WindowTopBarLine.Visible = true
+			TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, 800, 0, 500)
+			}):Play()
+			SideBar.Visible = true
+			ContentArea.Visible = true
 		else
-			MainWindow.ClipsDescendants = true
-			WindowTopBarLine.Visible = false
-			MinimizeBtn.Ico.Image = GetIcon("plus") or "rbxassetid://7072720870"
-
-			TweenService:Create(MainWindow, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, WindowName.TextBounds.X + 170, 0, 55)}):Play()
-			wait(0.1)
-			WindowStuff.Visible = false	
+			TweenService:Create(MainWindow, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, math.max(WindowTitle.TextBounds.X + 140, 300), 0, 50)
+			}):Play()
+			SideBar.Visible = false
+			ContentArea.Visible = false
 		end
-		Minimized = not Minimized    
+		Minimized = not Minimized
 	end)
 
-	local function LoadSequence()
-		MainWindow.Visible = false
-		local LoadSequenceLogo = SetProps(MakeElement("Image", WindowConfig.IntroIcon), {
-			Parent = NineNexus,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.4, 0),
-			Size = UDim2.new(0, 32, 0, 32),
-			ImageColor3 = NineNexusLib.Themes.Default.Accent,
-			ImageTransparency = 1
-		})
+	-- Клавиша Insert для показа/скрытия
+	AddConnection(UserInputService.InputBegan, function(Input)
+		if Input.KeyCode == Enum.KeyCode.Insert then
+			if UIHidden then
+				MainWindow.Visible = true
+				UIHidden = false
+			else
+				MainWindow.Visible = false
+				UIHidden = true
+				NineNexusLib:MakeNotification({
+					Name = "Interface Hidden",
+					Content = "Press Insert to show interface",
+					Image = "eye-off",
+					Time = 3
+				})
+			end
+		end
+	end)
 
-		local LoadSequenceText = SetProps(MakeElement("Label", WindowConfig.IntroText, 18), {
-			Parent = NineNexus,
-			Size = UDim2.new(1, 0, 1, 0),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 24, 0.5, 0),
-			TextXAlignment = Enum.TextXAlignment.Center,
-			Font = Enum.Font.GothamBold,
-			TextTransparency = 1,
-			TextColor3 = NineNexusLib.Themes.Default.Text
-		})
+	-- Перетаскивание
+	AddDraggingFunctionality(TopBar, MainWindow)
 
-		TweenService:Create(LoadSequenceLogo, TweenInfo.new(.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {ImageTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
-		wait(0.8)
-		TweenService:Create(LoadSequenceLogo, TweenInfo.new(.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, -(LoadSequenceText.TextBounds.X/2), 0.5, 0)}):Play()
-		wait(0.3)
-		TweenService:Create(LoadSequenceText, TweenInfo.new(.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-		wait(2)
-		TweenService:Create(LoadSequenceText, TweenInfo.new(.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
-		MainWindow.Visible = true
-		LoadSequenceLogo:Destroy()
-		LoadSequenceText:Destroy()
-	end 
-
-	if WindowConfig.IntroEnabled then
-		LoadSequence()
-	end	
-
+	-- Функции для работы с табами
 	local TabFunction = {}
+	
 	function TabFunction:MakeTab(TabConfig)
 		TabConfig = TabConfig or {}
 		TabConfig.Name = TabConfig.Name or "Tab"
 		TabConfig.Icon = TabConfig.Icon or "home"
 		TabConfig.PremiumOnly = TabConfig.PremiumOnly or false
 
-		local TabFrame = SetChildren(SetProps(MakeElement("Button"), {
-			Size = UDim2.new(1, 0, 0, 36),
-			Parent = TabHolder
-		}), {
-			AddThemeObject(SetProps(MakeElement("Image", GetIcon(TabConfig.Icon) or "rbxassetid://7072718307"), {
+		-- Создание кнопки таба
+		local TabButton = Create("TextButton", {
+			Name = "TabButton",
+			Size = UDim2.new(1, 0, 0, 40),
+			BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Text = "",
+			Parent = TabContainer
+		}, {
+			Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
+			Create("Frame", {
+				Name = "Highlight",
+				Size = UDim2.new(0, 3, 0, 20),
+				Position = UDim2.new(0, 0, 0.5, 0),
 				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = NineNexusLib.Themes.Default.Accent,
+				BorderSizePixel = 0,
+				Visible = false
+			}, {
+				Create("UICorner", {CornerRadius = UDim.new(0, 2)})
+			}),
+			Create("ImageLabel", {
+				Name = "Icon",
 				Size = UDim2.new(0, 20, 0, 20),
 				Position = UDim2.new(0, 12, 0.5, 0),
-				ImageTransparency = 0.4,
-				Name = "Ico"
-			}), "Text"),
-			AddThemeObject(SetProps(MakeElement("Label", TabConfig.Name, 15), {
-				Size = UDim2.new(1, -44, 1, 0),
-				Position = UDim2.new(0, 44, 0, 0),
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundTransparency = 1,
+				Image = GetIcon(TabConfig.Icon),
+				ImageColor3 = NineNexusLib.Themes.Default.TextDark
+			}),
+			Create("TextLabel", {
+				Name = "Label",
+				Size = UDim2.new(1, -45, 1, 0),
+				Position = UDim2.new(0, 40, 0, 0),
+				BackgroundTransparency = 1,
+				Text = TabConfig.Name,
+				TextColor3 = NineNexusLib.Themes.Default.TextDark,
+				TextSize = 14,
 				Font = Enum.Font.GothamSemibold,
-				TextTransparency = 0.4,
-				Name = "Title",
-				TextYAlignment = Enum.TextYAlignment.Center
-			}), "Text")
+				TextXAlignment = Enum.TextXAlignment.Left
+			})
 		})
 
-		local Container = AddThemeObject(SetChildren(SetProps(MakeElement("ScrollFrame", NineNexusLib.Themes.Default.Divider, 6), {
-			Size = UDim2.new(1, -165, 1, -55),
-			Position = UDim2.new(0, 165, 0, 55),
-			Parent = MainWindow,
+		-- Контейнер для содержимого таба
+		local TabContent = Create("ScrollingFrame", {
+			Name = "TabContent_" .. TabConfig.Name,
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScrollBarThickness = 6,
+			ScrollBarImageColor3 = NineNexusLib.Themes.Default.Stroke,
+			CanvasSize = UDim2.new(0, 0, 0, 0),
 			Visible = false,
-			Name = "ItemContainer"
-		}), {
-			MakeElement("List", 0, 8),
-			MakeElement("Padding", 20, 16, 16, 20)
-		}), "Divider")
+			Parent = ContentArea
+		}, {
+			Create("UIListLayout", {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8)
+			}),
+			Create("UIPadding", {
+				PaddingLeft = UDim.new(0, 20),
+				PaddingRight = UDim.new(0, 20),
+				PaddingTop = UDim.new(0, 20),
+				PaddingBottom = UDim.new(0, 20)
+			})
+		})
 
-		AddConnection(Container.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
-			Container.CanvasSize = UDim2.new(0, 0, 0, Container.UIListLayout.AbsoluteContentSize.Y + 40)
+		-- Обновление размера канваса
+		AddConnection(TabContent.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+			TabContent.CanvasSize = UDim2.new(0, 0, 0, TabContent.UIListLayout.AbsoluteContentSize.Y + 40)
 		end)
 
+		-- Если это первый таб, делаем его активным
 		if FirstTab then
 			FirstTab = false
-			TabFrame.Ico.ImageTransparency = 0
-			TabFrame.Title.TextTransparency = 0
-			TabFrame.Title.Font = Enum.Font.GothamBold
-			Container.Visible = true
-		end    
+			TabButton.BackgroundTransparency = 0.9
+			TabButton.Highlight.Visible = true
+			TabButton.Icon.ImageColor3 = NineNexusLib.Themes.Default.Accent
+			TabButton.Label.TextColor3 = NineNexusLib.Themes.Default.Text
+			TabButton.Label.Font = Enum.Font.GothamBold
+			TabContent.Visible = true
+		end
 
-		AddConnection(TabFrame.MouseButton1Click, function()
-			for _, Tab in next, TabHolder:GetChildren() do
+		-- Обработка клика по табу
+		AddConnection(TabButton.MouseButton1Click, function()
+			-- Деактивируем все табы
+			for _, Tab in pairs(TabContainer:GetChildren()) do
 				if Tab:IsA("TextButton") then
-					Tab.Title.Font = Enum.Font.GothamSemibold
-					TweenService:Create(Tab.Ico, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {ImageTransparency = 0.4}):Play()
-					TweenService:Create(Tab.Title, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 0.4}):Play()
-				end    
+					Tab.BackgroundTransparency = 1
+					Tab.Highlight.Visible = false
+					Tab.Icon.ImageColor3 = NineNexusLib.Themes.Default.TextDark
+					Tab.Label.TextColor3 = NineNexusLib.Themes.Default.TextDark
+					Tab.Label.Font = Enum.Font.GothamSemibold
+				end
 			end
-			for _, ItemContainer in next, MainWindow:GetChildren() do
-				if ItemContainer.Name == "ItemContainer" then
-					ItemContainer.Visible = false
-				end    
-			end  
-			TweenService:Create(TabFrame.Ico, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
-			TweenService:Create(TabFrame.Title, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-			TabFrame.Title.Font = Enum.Font.GothamBold
-			Container.Visible = true   
+			
+			-- Скрываем все контенты
+			for _, Content in pairs(ContentArea:GetChildren()) do
+				if Content.Name:find("TabContent_") then
+					Content.Visible = false
+				end
+			end
+			
+			-- Активируем текущий таб
+			TabButton.BackgroundTransparency = 0.9
+			TabButton.Highlight.Visible = true
+			TabButton.Icon.ImageColor3 = NineNexusLib.Themes.Default.Accent
+			TabButton.Label.TextColor3 = NineNexusLib.Themes.Default.Text
+			TabButton.Label.Font = Enum.Font.GothamBold
+			TabContent.Visible = true
 		end)
 
-		local function GetElements(ItemParent)
-			local ElementFunction = {}
-			function ElementFunction:AddLabel(Text)
-				local LabelFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 38),
-					BackgroundTransparency = 0.7,
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", Text, 16), {
-						Size = UDim2.new(1, -20, 1, 0),
-						Position = UDim2.new(0, 20, 0, 0),
-						Font = Enum.Font.GothamBold,
-						Name = "Content",
-						TextYAlignment = Enum.TextYAlignment.Center
-					}), "Text"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke")
-				}), "Second")
-
-				local LabelFunction = {}
-				function LabelFunction:Set(ToChange)
-					LabelFrame.Content.Text = ToChange
-				end
-				return LabelFunction
+		-- Hover эффекты
+		AddConnection(TabButton.MouseEnter, function()
+			if not TabButton.Highlight.Visible then
+				TweenService:Create(TabButton, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+					BackgroundTransparency = 0.95
+				}):Play()
 			end
-			function ElementFunction:AddParagraph(Text, Content)
-				Text = Text or "Text"
-				Content = Content or "Content"
+		end)
 
-				local ParagraphFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 38),
-					BackgroundTransparency = 0.7,
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", Text, 16), {
-						Size = UDim2.new(1, -20, 0, 18),
-						Position = UDim2.new(0, 20, 0, 12),
-						Font = Enum.Font.GothamBold,
-						Name = "Title"
-					}), "Text"),
-					AddThemeObject(SetProps(MakeElement("Label", "", 14), {
-						Size = UDim2.new(1, -32, 0, 0),
-						Position = UDim2.new(0, 20, 0, 32),
-						Font = Enum.Font.GothamMedium,
-						Name = "Content",
-						TextWrapped = true,
-						TextXAlignment = Enum.TextXAlignment.Left
-					}), "TextDark"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke")
-				}), "Second")
+		AddConnection(TabButton.MouseLeave, function()
+			if not TabButton.Highlight.Visible then
+				TweenService:Create(TabButton, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+					BackgroundTransparency = 1
+				}):Play()
+			end
+		end)
 
-				AddConnection(ParagraphFrame.Content:GetPropertyChangedSignal("Text"), function()
-					ParagraphFrame.Content.Size = UDim2.new(1, -32, 0, ParagraphFrame.Content.TextBounds.Y)
-					ParagraphFrame.Size = UDim2.new(1, 0, 0, ParagraphFrame.Content.TextBounds.Y + 44)
-				end)
+		-- Функции для элементов
+		local ElementFunction = {}
 
-				ParagraphFrame.Content.Text = Content
+		function ElementFunction:AddSection(SectionConfig)
+			SectionConfig = SectionConfig or {}
+			SectionConfig.Name = SectionConfig.Name or "Section"
 
-				local ParagraphFunction = {}
-				function ParagraphFunction:Set(ToChange)
-					ParagraphFrame.Content.Text = ToChange
-				end
-				return ParagraphFunction
-			end    
-			function ElementFunction:AddButton(ButtonConfig)
-				ButtonConfig = ButtonConfig or {}
-				ButtonConfig.Name = ButtonConfig.Name or "Button"
-				ButtonConfig.Callback = ButtonConfig.Callback or function() end
-				ButtonConfig.Icon = ButtonConfig.Icon or "play"
-
-				local Button = {}
-
-				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
+			local SectionFrame = Create("Frame", {
+				Name = "Section",
+				Size = UDim2.new(1, 0, 0, 30),
+				BackgroundTransparency = 1,
+				Parent = TabContent
+			}, {
+				Create("TextLabel", {
+					Name = "SectionTitle",
+					Size = UDim2.new(1, 0, 0, 20),
+					BackgroundTransparency = 1,
+					Text = SectionConfig.Name,
+					TextColor3 = NineNexusLib.Themes.Default.TextDark,
+					TextSize = 16,
+					Font = Enum.Font.GothamBold,
+					TextXAlignment = Enum.TextXAlignment.Left
+				}),
+				Create("Frame", {
+					Name = "SectionContent",
+					Size = UDim2.new(1, 0, 0, 0),
+					Position = UDim2.new(0, 0, 0, 25),
+					BackgroundTransparency = 1
+				}, {
+					Create("UIListLayout", {
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 6)
+					})
 				})
+			})
 
-				local ButtonFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 42),
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", ButtonConfig.Name, 16), {
-						Size = UDim2.new(1, -52, 1, 0),
-						Position = UDim2.new(0, 20, 0, 0),
-						Font = Enum.Font.GothamBold,
-						Name = "Content",
-						TextYAlignment = Enum.TextYAlignment.Center
-					}), "Text"),
-					AddThemeObject(SetProps(MakeElement("Image", GetIcon(ButtonConfig.Icon) or "rbxassetid://7072718307"), {
-						Size = UDim2.new(0, 20, 0, 20),
-						Position = UDim2.new(1, -32, 0.5, -10),
-						ImageColor3 = NineNexusLib.Themes.Default.Accent
-					}), "TextDark"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					Click
-				}), "Second")
+			-- Обновление размера секции
+			AddConnection(SectionFrame.SectionContent.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+				SectionFrame.Size = UDim2.new(1, 0, 0, SectionFrame.SectionContent.UIListLayout.AbsoluteContentSize.Y + 30)
+				SectionFrame.SectionContent.Size = UDim2.new(1, 0, 0, SectionFrame.SectionContent.UIListLayout.AbsoluteContentSize.Y)
+			end)
 
-				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 8)}):Play()
-				end)
+			local SectionFunction = {}
 
-				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second}):Play()
-				end)
-
-				AddConnection(Click.MouseButton1Up, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 8)}):Play()
-					spawn(function()
-						ButtonConfig.Callback()
-					end)
-				end)
-
-				AddConnection(Click.MouseButton1Down, function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 15, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 15, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 15)}):Play()
-				end)
-
-				function Button:Set(ButtonText)
-					ButtonFrame.Content.Text = ButtonText
-				end	
-
-				return Button
-			end    
-			function ElementFunction:AddToggle(ToggleConfig)
+			function SectionFunction:AddToggle(ToggleConfig)
 				ToggleConfig = ToggleConfig or {}
 				ToggleConfig.Name = ToggleConfig.Name or "Toggle"
 				ToggleConfig.Default = ToggleConfig.Default or false
 				ToggleConfig.Callback = ToggleConfig.Callback or function() end
-				ToggleConfig.Color = ToggleConfig.Color or NineNexusLib.Themes.Default.Accent
-				ToggleConfig.Flag = ToggleConfig.Flag or nil
-				ToggleConfig.Save = ToggleConfig.Save or false
 
-				local Toggle = {Value = ToggleConfig.Default, Save = ToggleConfig.Save}
+				local Toggle = {Value = ToggleConfig.Default}
 
-				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
-				})
-
-				local ToggleBox = SetChildren(SetProps(MakeElement("RoundFrame", ToggleConfig.Color, 0, 6), {
-					Size = UDim2.new(0, 28, 0, 28),
-					Position = UDim2.new(1, -40, 0.5, -14),
-					AnchorPoint = Vector2.new(0, 0)
-				}), {
-					SetProps(MakeElement("Stroke"), {
-						Color = ToggleConfig.Color,
-						Name = "Stroke",
-						Transparency = 0.5,
-						Thickness = 1.5
+				local ToggleFrame = Create("Frame", {
+					Name = "Toggle",
+					Size = UDim2.new(1, 0, 0, 45),
+					BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+					BorderSizePixel = 0,
+					Parent = SectionFrame.SectionContent
+				}, {
+					Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
+					Create("UIStroke", {
+						Color = NineNexusLib.Themes.Default.Stroke,
+						Thickness = 1
 					}),
-					SetProps(MakeElement("Image", GetIcon("check") or "rbxassetid://7072706796"), {
-						Size = UDim2.new(0, 18, 0, 18),
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.new(0.5, 0, 0.5, 0),
-						ImageColor3 = Color3.fromRGB(255, 255, 255),
-						Name = "Ico"
+					Create("TextLabel", {
+						Name = "Label",
+						Size = UDim2.new(1, -60, 1, 0),
+						Position = UDim2.new(0, 15, 0, 0),
+						BackgroundTransparency = 1,
+						Text = ToggleConfig.Name,
+						TextColor3 = NineNexusLib.Themes.Default.Text,
+						TextSize = 14,
+						Font = Enum.Font.GothamSemibold,
+						TextXAlignment = Enum.TextXAlignment.Left
 					}),
+					Create("TextButton", {
+						Name = "ToggleButton",
+						Size = UDim2.new(0, 45, 0, 25),
+						Position = UDim2.new(1, -55, 0.5, 0),
+						AnchorPoint = Vector2.new(0, 0.5),
+						BackgroundColor3 = ToggleConfig.Default and NineNexusLib.Themes.Default.Accent or NineNexusLib.Themes.Default.Stroke,
+						BorderSizePixel = 0,
+						Text = ""
+					}, {
+						Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
+						Create("Frame", {
+							Name = "Thumb",
+							Size = UDim2.new(0, 19, 0, 19),
+							Position = ToggleConfig.Default and UDim2.new(1, -22, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+							AnchorPoint = Vector2.new(0, 0.5),
+							BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+							BorderSizePixel = 0
+						}, {
+							Create("UICorner", {CornerRadius = UDim.new(1, 0)})
+						})
+					})
 				})
-
-				local ToggleFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 46),
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", ToggleConfig.Name, 16), {
-						Size = UDim2.new(1, -80, 1, 0),
-						Position = UDim2.new(0, 20, 0, 0),
-						Font = Enum.Font.GothamBold,
-						Name = "Content",
-						TextYAlignment = Enum.TextYAlignment.Center
-					}), "Text"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					ToggleBox,
-					Click
-				}), "Second")
 
 				function Toggle:Set(Value)
-					Toggle.Value = Value
-					TweenService:Create(ToggleBox, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Toggle.Value and ToggleConfig.Color or NineNexusLib.Themes.Default.Divider}):Play()
-					TweenService:Create(ToggleBox.Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Color = Toggle.Value and ToggleConfig.Color or NineNexusLib.Themes.Default.Stroke}):Play()
-					TweenService:Create(ToggleBox.Ico, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-						ImageTransparency = Toggle.Value and 0 or 1, 
-						Size = Toggle.Value and UDim2.new(0, 18, 0, 18) or UDim2.new(0, 12, 0, 12)
+					self.Value = Value
+					
+					TweenService:Create(ToggleFrame.ToggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+						BackgroundColor3 = Value and NineNexusLib.Themes.Default.Accent or NineNexusLib.Themes.Default.Stroke
 					}):Play()
-					ToggleConfig.Callback(Toggle.Value)
-				end    
+					
+					TweenService:Create(ToggleFrame.ToggleButton.Thumb, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+						Position = Value and UDim2.new(1, -22, 0.5, 0) or UDim2.new(0, 3, 0.5, 0)
+					}):Play()
+					
+					ToggleConfig.Callback(Value)
+				end
 
-				Toggle:Set(Toggle.Value)
-
-				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 8)}):Play()
-				end)
-
-				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second}):Play()
-				end)
-
-				AddConnection(Click.MouseButton1Up, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 8)}):Play()
-					SaveCfg(game.GameId)
+				AddConnection(ToggleFrame.ToggleButton.MouseButton1Click, function()
 					Toggle:Set(not Toggle.Value)
 				end)
 
-				AddConnection(Click.MouseButton1Down, function()
-					TweenService:Create(ToggleFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 15, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 15, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 15)}):Play()
-				end)
-
-				if ToggleConfig.Flag then
-					NineNexusLib.Flags[ToggleConfig.Flag] = Toggle
-				end	
 				return Toggle
-			end  
-			function ElementFunction:AddSlider(SliderConfig)
+			end
+
+			function SectionFunction:AddSlider(SliderConfig)
 				SliderConfig = SliderConfig or {}
 				SliderConfig.Name = SliderConfig.Name or "Slider"
 				SliderConfig.Min = SliderConfig.Min or 0
 				SliderConfig.Max = SliderConfig.Max or 100
 				SliderConfig.Increment = SliderConfig.Increment or 1
 				SliderConfig.Default = SliderConfig.Default or 50
-				SliderConfig.Callback = SliderConfig.Callback or function() end
 				SliderConfig.ValueName = SliderConfig.ValueName or ""
-				SliderConfig.Color = SliderConfig.Color or NineNexusLib.Themes.Default.Accent
-				SliderConfig.Flag = SliderConfig.Flag or nil
-				SliderConfig.Save = SliderConfig.Save or false
+				SliderConfig.Callback = SliderConfig.Callback or function() end
 
-				local Slider = {Value = SliderConfig.Default, Save = SliderConfig.Save}
+				local Slider = {Value = SliderConfig.Default}
 				local Dragging = false
 
-				-- Красивый ползунок
-				local SliderThumb = SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 1, 0), {
-					Size = UDim2.new(0, 20, 0, 20),
-					Position = UDim2.new(0, 0, 0.5, -10),
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					ZIndex = 5
-				}), {
-					MakeElement("Stroke", SliderConfig.Color, 2)
-				})
-
-				local SliderDrag = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 8), {
-					Size = UDim2.new(0, 0, 0, 8),
-					Position = UDim2.new(0, 0, 0.5, -4),
-					BackgroundTransparency = 0,
-					ClipsDescendants = false,
-					ZIndex = 3
-				}), {
-					SliderThumb
-				})
-
-				local SliderBar = SetChildren(SetProps(MakeElement("RoundFrame", NineNexusLib.Themes.Default.Stroke, 0, 8), {
-					Size = UDim2.new(1, -40, 0, 8),
-					Position = UDim2.new(0, 20, 0, 46),
-					BackgroundTransparency = 0,
-					ZIndex = 2
-				}), {
-					SliderDrag
-				})
-
-				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 72),
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", SliderConfig.Name, 16), {
-						Size = UDim2.new(1, -80, 0, 18),
-						Position = UDim2.new(0, 20, 0, 12),
-						Font = Enum.Font.GothamBold,
-						Name = "Content"
-					}), "Text"),
-					AddThemeObject(SetProps(MakeElement("Label", "50", 15), {
-						Size = UDim2.new(0, 60, 0, 18),
-						Position = UDim2.new(1, -80, 0, 12),
-						Font = Enum.Font.GothamBold,
-						Name = "Value",
-						TextXAlignment = Enum.TextXAlignment.Right,
-						TextColor3 = SliderConfig.Color
-					}), "Text"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					SliderBar
-				}), "Second")
-
-				SliderBar.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 then 
-						Dragging = true 
-					end 
-				end)
-				SliderBar.InputEnded:Connect(function(Input) 
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 then 
-						Dragging = false 
-					end 
-				end)
-
-				UserInputService.InputChanged:Connect(function(Input)
-					if Dragging and Input.UserInputType == Enum.UserInputType.MouseMovement then 
-						local SizeScale = math.clamp((Input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
-						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale)) 
-						SaveCfg(game.GameId)
-					end
-				end)
-
-				function Slider:Set(Value)
-					self.Value = math.clamp(Round(Value, SliderConfig.Increment), SliderConfig.Min, SliderConfig.Max)
-					local ValuePercent = (self.Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
-					
-					TweenService:Create(SliderDrag, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-						Size = UDim2.fromScale(ValuePercent, 1)
-					}):Play()
-					
-					TweenService:Create(SliderThumb, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-						Position = UDim2.new(ValuePercent, 0, 0.5, -10)
-					}):Play()
-					
-					SliderFrame.Value.Text = tostring(self.Value) .. " " .. SliderConfig.ValueName
-					SliderConfig.Callback(self.Value)
-				end      
-
-				Slider:Set(Slider.Value)
-				if SliderConfig.Flag then				
-					NineNexusLib.Flags[SliderConfig.Flag] = Slider
-				end
-				return Slider
-			end  
-			function ElementFunction:AddDropdown(DropdownConfig)
-				DropdownConfig = DropdownConfig or {}
-				DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
-				DropdownConfig.Options = DropdownConfig.Options or {}
-				DropdownConfig.Default = DropdownConfig.Default or ""
-				DropdownConfig.Callback = DropdownConfig.Callback or function() end
-				DropdownConfig.Flag = DropdownConfig.Flag or nil
-				DropdownConfig.Save = DropdownConfig.Save or false
-
-				local Dropdown = {Value = DropdownConfig.Default, Options = DropdownConfig.Options, Buttons = {}, Toggled = false, Type = "Dropdown", Save = DropdownConfig.Save}
-				local MaxElements = 5
-
-				if not table.find(Dropdown.Options, Dropdown.Value) then
-					Dropdown.Value = "..."
-				end
-
-				local DropdownList = MakeElement("List", 0, 2)
-
-				local DropdownContainer = AddThemeObject(SetProps(SetChildren(MakeElement("ScrollFrame", NineNexusLib.Themes.Default.Divider, 6), {
-					DropdownList
-				}), {
-					Parent = ItemParent,
-					Position = UDim2.new(0, 0, 0, 46),
-					Size = UDim2.new(1, 0, 1, -46),
-					ClipsDescendants = true
-				}), "Divider")
-
-				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
-				})
-
-				local DropdownFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 46),
-					Parent = ItemParent,
-					ClipsDescendants = true
-				}), {
-					DropdownContainer,
-					SetProps(SetChildren(MakeElement("TFrame"), {
-						AddThemeObject(SetProps(MakeElement("Label", DropdownConfig.Name, 16), {
-							Size = UDim2.new(1, -52, 1, 0),
-							Position = UDim2.new(0, 20, 0, 0),
-							Font = Enum.Font.GothamBold,
-							Name = "Content",
-							TextYAlignment = Enum.TextYAlignment.Center
-						}), "Text"),
-						AddThemeObject(SetProps(MakeElement("Image", GetIcon("chevron-down") or "rbxassetid://7072706796"), {
-							Size = UDim2.new(0, 18, 0, 18),
-							AnchorPoint = Vector2.new(0, 0.5),
-							Position = UDim2.new(1, -32, 0.5, 0),
-							ImageColor3 = NineNexusLib.Themes.Default.Text,
-							Name = "Ico"
-						}), "TextDark"),
-						AddThemeObject(SetProps(MakeElement("Label", "Selected", 14), {
-							Size = UDim2.new(1, -60, 1, 0),
-							Font = Enum.Font.GothamMedium,
-							Name = "Selected",
-							TextXAlignment = Enum.TextXAlignment.Right,
-							TextYAlignment = Enum.TextYAlignment.Center,
-							Position = UDim2.new(0, 20, 0, 0)
-						}), "TextDark"),
-						AddThemeObject(SetProps(MakeElement("Frame"), {
-							Size = UDim2.new(1, 0, 0, 1.5),
-							Position = UDim2.new(0, 0, 1, -1.5),
-							Name = "Line",
-							Visible = false
-						}), "Stroke"), 
-						Click
-					}), {
-						Size = UDim2.new(1, 0, 0, 46),
-						ClipsDescendants = true,
-						Name = "F"
+				local SliderFrame = Create("Frame", {
+					Name = "Slider",
+					Size = UDim2.new(1, 0, 0, 65),
+					BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+					BorderSizePixel = 0,
+					Parent = SectionFrame.SectionContent
+				}, {
+					Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
+					Create("UIStroke", {
+						Color = NineNexusLib.Themes.Default.Stroke,
+						Thickness = 1
 					}),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					MakeElement("Corner", 0, 8)
-				}), "Second")
-
-				AddConnection(DropdownList:GetPropertyChangedSignal("AbsoluteContentSize"), function()
-					DropdownContainer.CanvasSize = UDim2.new(0, 0, 0, DropdownList.AbsoluteContentSize.Y)
-				end)  
-
-				local function AddOptions(Options)
-					for _, Option in pairs(Options) do
-						local OptionBtn = AddThemeObject(SetProps(SetChildren(MakeElement("Button", NineNexusLib.Themes.Default.Second), {
-							MakeElement("Corner", 0, 6),
-							AddThemeObject(SetProps(MakeElement("Label", Option, 14, 0.4), {
-								Position = UDim2.new(0, 12, 0, 0),
-								Size = UDim2.new(1, -12, 1, 0),
-								Name = "Title",
-								TextYAlignment = Enum.TextYAlignment.Center
-							}), "Text")
-						}), {
-							Parent = DropdownContainer,
-							Size = UDim2.new(1, 0, 0, 32),
-							BackgroundTransparency = 1,
-							ClipsDescendants = true
-						}), "Divider")
-
-						AddConnection(OptionBtn.MouseButton1Click, function()
-							Dropdown:Set(Option)
-							SaveCfg(game.GameId)
-						end)
-
-						Dropdown.Buttons[Option] = OptionBtn
-					end
-				end	
-
-				function Dropdown:Refresh(Options, Delete)
-					if Delete then
-						for _,v in pairs(Dropdown.Buttons) do
-							v:Destroy()
-						end    
-						table.clear(Dropdown.Options)
-						table.clear(Dropdown.Buttons)
-					end
-					Dropdown.Options = Options
-					AddOptions(Dropdown.Options)
-				end  
-
-				function Dropdown:Set(Value)
-					if not table.find(Dropdown.Options, Value) then
-						Dropdown.Value = "..."
-						DropdownFrame.F.Selected.Text = Dropdown.Value
-						for _, v in pairs(Dropdown.Buttons) do
-							TweenService:Create(v, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-							TweenService:Create(v.Title, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 0.4}):Play()
-						end	
-						return
-					end
-
-					Dropdown.Value = Value
-					DropdownFrame.F.Selected.Text = Dropdown.Value
-
-					for _, v in pairs(Dropdown.Buttons) do
-						TweenService:Create(v, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-						TweenService:Create(v.Title, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 0.4}):Play()
-					end	
-					TweenService:Create(Dropdown.Buttons[Value], TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-					TweenService:Create(Dropdown.Buttons[Value].Title, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-					return DropdownConfig.Callback(Dropdown.Value)
-				end
-
-				AddConnection(Click.MouseButton1Click, function()
-					Dropdown.Toggled = not Dropdown.Toggled
-					DropdownFrame.F.Line.Visible = Dropdown.Toggled
-					TweenService:Create(DropdownFrame.F.Ico, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Rotation = Dropdown.Toggled and 180 or 0}):Play()
-					if #Dropdown.Options > MaxElements then
-						TweenService:Create(DropdownFrame, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Dropdown.Toggled and UDim2.new(1, 0, 0, 46 + (MaxElements * 34)) or UDim2.new(1, 0, 0, 46)}):Play()
-					else
-						TweenService:Create(DropdownFrame, TweenInfo.new(.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Dropdown.Toggled and UDim2.new(1, 0, 0, DropdownList.AbsoluteContentSize.Y + 50) or UDim2.new(1, 0, 0, 46)}):Play()
-					end
-				end)
-
-				Dropdown:Refresh(Dropdown.Options, false)
-				Dropdown:Set(Dropdown.Value)
-				if DropdownConfig.Flag then				
-					NineNexusLib.Flags[DropdownConfig.Flag] = Dropdown
-				end
-				return Dropdown
-			end
-			function ElementFunction:AddBind(BindConfig)
-				BindConfig.Name = BindConfig.Name or "Keybind"
-				BindConfig.Default = BindConfig.Default or Enum.KeyCode.Unknown
-				BindConfig.Hold = BindConfig.Hold or false
-				BindConfig.Callback = BindConfig.Callback or function() end
-				BindConfig.Flag = BindConfig.Flag or nil
-				BindConfig.Save = BindConfig.Save or false
-
-				local Bind = {Value, Binding = false, Type = "Bind", Save = BindConfig.Save}
-				local Holding = false
-
-				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
-				})
-
-				local BindBox = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 6), {
-					Size = UDim2.new(0, 36, 0, 28),
-					Position = UDim2.new(1, -48, 0.5, -14),
-					AnchorPoint = Vector2.new(0, 0)
-				}), {
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					AddThemeObject(SetProps(MakeElement("Label", "F", 14), {
-						Size = UDim2.new(1, 0, 1, 0),
+					Create("TextLabel", {
+						Name = "Label",
+						Size = UDim2.new(1, -80, 0, 20),
+						Position = UDim2.new(0, 15, 0, 10),
+						BackgroundTransparency = 1,
+						Text = SliderConfig.Name,
+						TextColor3 = NineNexusLib.Themes.Default.Text,
+						TextSize = 14,
+						Font = Enum.Font.GothamSemibold,
+						TextXAlignment = Enum.TextXAlignment.Left
+					}),
+					Create("TextLabel", {
+						Name = "Value",
+						Size = UDim2.new(0, 70, 0, 20),
+						Position = UDim2.new(1, -85, 0, 10),
+						BackgroundTransparency = 1,
+						Text = tostring(SliderConfig.Default) .. SliderConfig.ValueName,
+						TextColor3 = NineNexusLib.Themes.Default.Accent,
+						TextSize = 14,
 						Font = Enum.Font.GothamBold,
-						TextXAlignment = Enum.TextXAlignment.Center,
-						TextYAlignment = Enum.TextYAlignment.Center,
-						Name = "Value"
-					}), "Text")
-				}), "Main")
-
-				local BindFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 46),
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", BindConfig.Name, 16), {
-						Size = UDim2.new(1, -60, 1, 0),
-						Position = UDim2.new(0, 20, 0, 0),
-						Font = Enum.Font.GothamBold,
-						Name = "Content",
-						TextYAlignment = Enum.TextYAlignment.Center
-					}), "Text"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					BindBox,
-					Click
-				}), "Second")
-
-				AddConnection(BindBox.Value:GetPropertyChangedSignal("Text"), function()
-					TweenService:Create(BindBox, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0, math.max(36, BindBox.Value.TextBounds.X + 20), 0, 28)}):Play()
-				end)
-
-				AddConnection(Click.InputEnded, function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-						if Bind.Binding then return end
-						Bind.Binding = true
-						BindBox.Value.Text = "..."
-					end
-				end)
-
-				AddConnection(UserInputService.InputBegan, function(Input)
-					if UserInputService:GetFocusedTextBox() then return end
-					if (Input.KeyCode.Name == Bind.Value or Input.UserInputType.Name == Bind.Value) and not Bind.Binding then
-						if BindConfig.Hold then
-							Holding = true
-							BindConfig.Callback(Holding)
-						else
-							BindConfig.Callback()
-						end
-					elseif Bind.Binding then
-						local Key
-						pcall(function()
-							if not CheckKey(BlacklistedKeys, Input.KeyCode) then
-								Key = Input.KeyCode
-							end
-						end)
-						pcall(function()
-							if CheckKey(WhitelistedMouse, Input.UserInputType) and not Key then
-								Key = Input.UserInputType
-							end
-						end)
-						Key = Key or Bind.Value
-						Bind:Set(Key)
-						SaveCfg(game.GameId)
-					end
-				end)
-
-				AddConnection(UserInputService.InputEnded, function(Input)
-					if Input.KeyCode.Name == Bind.Value or Input.UserInputType.Name == Bind.Value then
-						if BindConfig.Hold and Holding then
-							Holding = false
-							BindConfig.Callback(Holding)
-						end
-					end
-				end)
-
-				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 8)}):Play()
-				end)
-
-				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(BindFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second}):Play()
-				end)
-
-				function Bind:Set(Key)
-					Bind.Binding = false
-					Bind.Value = Key or Bind.Value
-					Bind.Value = Bind.Value.Name or Bind.Value
-					BindBox.Value.Text = Bind.Value
-				end
-
-				Bind:Set(BindConfig.Default)
-				if BindConfig.Flag then				
-					NineNexusLib.Flags[BindConfig.Flag] = Bind
-				end
-				return Bind
-			end  
-			function ElementFunction:AddTextbox(TextboxConfig)
-				TextboxConfig = TextboxConfig or {}
-				TextboxConfig.Name = TextboxConfig.Name or "Textbox"
-				TextboxConfig.Default = TextboxConfig.Default or ""
-				TextboxConfig.TextDisappear = TextboxConfig.TextDisappear or false
-				TextboxConfig.Callback = TextboxConfig.Callback or function() end
-
-				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
-				})
-
-				local TextboxActual = AddThemeObject(Create("TextBox", {
-					Size = UDim2.new(1, 0, 1, 0),
-					BackgroundTransparency = 1,
-					TextColor3 = NineNexusLib.Themes.Default.Text,
-					PlaceholderColor3 = NineNexusLib.Themes.Default.TextDark,
-					PlaceholderText = "Enter text...",
-					Font = Enum.Font.GothamMedium,
-					TextXAlignment = Enum.TextXAlignment.Center,
-					TextYAlignment = Enum.TextYAlignment.Center,
-					TextSize = 14,
-					ClearTextOnFocus = false
-				}), "Text")
-
-				local TextContainer = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 6), {
-					Size = UDim2.new(0, 80, 0, 28),
-					Position = UDim2.new(1, -92, 0.5, -14),
-					AnchorPoint = Vector2.new(0, 0)
-				}), {
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					TextboxActual
-				}), "Main")
-
-				local TextboxFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 46),
-					Parent = ItemParent
-				}), {
-					AddThemeObject(SetProps(MakeElement("Label", TextboxConfig.Name, 16), {
-						Size = UDim2.new(1, -112, 1, 0),
-						Position = UDim2.new(0, 20, 0, 0),
-						Font = Enum.Font.GothamBold,
-						Name = "Content",
-						TextYAlignment = Enum.TextYAlignment.Center
-					}), "Text"),
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-					TextContainer,
-					Click
-				}), "Second")
-
-				AddConnection(TextboxActual:GetPropertyChangedSignal("Text"), function()
-					TweenService:Create(TextContainer, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0, math.max(80, TextboxActual.TextBounds.X + 24), 0, 28)}):Play()
-				end)
-
-				AddConnection(TextboxActual.FocusLost, function()
-					TextboxConfig.Callback(TextboxActual.Text)
-					if TextboxConfig.TextDisappear then
-						TextboxActual.Text = ""
-					end	
-				end)
-
-				TextboxActual.Text = TextboxConfig.Default
-
-				AddConnection(Click.MouseEnter, function()
-					TweenService:Create(TextboxFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.R * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.G * 255 + 8, NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second.B * 255 + 8)}):Play()
-				end)
-
-				AddConnection(Click.MouseLeave, function()
-					TweenService:Create(TextboxFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundColor3 = NineNexusLib.Themes[NineNexusLib.SelectedTheme].Second}):Play()
-				end)
-
-				AddConnection(Click.MouseButton1Up, function()
-					TextboxActual:CaptureFocus()
-				end)
-			end 
-			function ElementFunction:AddColorpicker(ColorpickerConfig)
-				ColorpickerConfig = ColorpickerConfig or {}
-				ColorpickerConfig.Name = ColorpickerConfig.Name or "Colorpicker"
-				ColorpickerConfig.Default = ColorpickerConfig.Default or Color3.fromRGB(88, 166, 255)
-				ColorpickerConfig.Callback = ColorpickerConfig.Callback or function() end
-				ColorpickerConfig.Flag = ColorpickerConfig.Flag or nil
-				ColorpickerConfig.Save = ColorpickerConfig.Save or false
-
-				local ColorH, ColorS, ColorV = 1, 1, 1
-				local Colorpicker = {Value = ColorpickerConfig.Default, Toggled = false, Type = "Colorpicker", Save = ColorpickerConfig.Save}
-
-				local ColorSelection = Create("ImageLabel", {
-					Size = UDim2.new(0, 18, 0, 18),
-					Position = UDim2.new(select(3, Color3.toHSV(Colorpicker.Value))),
-					ScaleType = Enum.ScaleType.Fit,
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Image = "http://www.roblox.com/asset/?id=4805639000"
-				})
-
-				local HueSelection = Create("ImageLabel", {
-					Size = UDim2.new(0, 18, 0, 18),
-					Position = UDim2.new(0.5, 0, 1 - select(1, Color3.toHSV(Colorpicker.Value))),
-					ScaleType = Enum.ScaleType.Fit,
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					BackgroundTransparency = 1,
-					Image = "http://www.roblox.com/asset/?id=4805639000"
-				})
-
-				local Color = Create("ImageLabel", {
-					Size = UDim2.new(1, -30, 1, 0),
-					Visible = false,
-					Image = "rbxassetid://4155801252"
-				}, {
-					Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
-					ColorSelection
-				})
-
-				local Hue = Create("Frame", {
-					Size = UDim2.new(0, 24, 1, 0),
-					Position = UDim2.new(1, -24, 0, 0),
-					Visible = false
-				}, {
-					Create("UIGradient", {Rotation = 270, Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 4)), ColorSequenceKeypoint.new(0.20, Color3.fromRGB(234, 255, 0)), ColorSequenceKeypoint.new(0.40, Color3.fromRGB(21, 255, 0)), ColorSequenceKeypoint.new(0.60, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.80, Color3.fromRGB(0, 17, 255)), ColorSequenceKeypoint.new(0.90, Color3.fromRGB(255, 0, 251)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 4))},}),
-					Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
-					HueSelection
-				})
-
-				local ColorpickerContainer = Create("Frame", {
-					Position = UDim2.new(0, 0, 0, 46),
-					Size = UDim2.new(1, 0, 1, -46),
-					BackgroundTransparency = 1,
-					ClipsDescendants = true
-				}, {
-					Hue,
-					Color,
-					Create("UIPadding", {
-						PaddingLeft = UDim.new(0, 20),
-						PaddingRight = UDim.new(0, 20),
-						PaddingBottom = UDim.new(0, 16),
-						PaddingTop = UDim.new(0, 16)
+						TextXAlignment = Enum.TextXAlignment.Right
+					}),
+					Create("Frame", {
+						Name = "SliderTrack",
+						Size = UDim2.new(1, -30, 0, 6),
+						Position = UDim2.new(0, 15, 0, 40),
+						BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+						BorderSizePixel = 0
+					}, {
+						Create("UICorner", {CornerRadius = UDim.new(0, 3)}),
+						Create("Frame", {
+							Name = "SliderFill",
+							Size = UDim2.new(((SliderConfig.Default - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)), 0, 1, 0),
+							BackgroundColor3 = NineNexusLib.Themes.Default.Accent,
+							BorderSizePixel = 0
+						}, {
+							Create("UICorner", {CornerRadius = UDim.new(0, 3)})
+						}),
+						Create("Frame", {
+							Name = "SliderThumb",
+							Size = UDim2.new(0, 16, 0, 16),
+							Position = UDim2.new(((SliderConfig.Default - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)), -8, 0.5, 0),
+							AnchorPoint = Vector2.new(0, 0.5),
+							BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+							BorderSizePixel = 0
+						}, {
+							Create("UICorner", {CornerRadius = UDim.new(1, 0)}),
+							Create("UIStroke", {
+								Color = NineNexusLib.Themes.Default.Accent,
+								Thickness = 2
+							})
+						})
 					})
 				})
 
-				local Click = SetProps(MakeElement("Button"), {
-					Size = UDim2.new(1, 0, 1, 0)
+				function Slider:Set(Value)
+					self.Value = math.clamp(Round(Value, SliderConfig.Increment), SliderConfig.Min, SliderConfig.Max)
+					local Percentage = (self.Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+					
+					SliderFrame.Value.Text = tostring(self.Value) .. SliderConfig.ValueName
+					
+					TweenService:Create(SliderFrame.SliderTrack.SliderFill, TweenInfo.new(0.1, Enum.EasingStyle.Quint), {
+						Size = UDim2.new(Percentage, 0, 1, 0)
+					}):Play()
+					
+					TweenService:Create(SliderFrame.SliderTrack.SliderThumb, TweenInfo.new(0.1, Enum.EasingStyle.Quint), {
+						Position = UDim2.new(Percentage, -8, 0.5, 0)
+					}):Play()
+					
+					SliderConfig.Callback(self.Value)
+				end
+
+				AddConnection(SliderFrame.SliderTrack.InputBegan, function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						Dragging = true
+					end
+				end)
+
+				AddConnection(SliderFrame.SliderTrack.InputEnded, function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						Dragging = false
+					end
+				end)
+
+				AddConnection(UserInputService.InputChanged, function(Input)
+					if Dragging and Input.UserInputType == Enum.UserInputType.MouseMovement then
+						local SizeScale = math.clamp((Input.Position.X - SliderFrame.SliderTrack.AbsolutePosition.X) / SliderFrame.SliderTrack.AbsoluteSize.X, 0, 1)
+						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale))
+					end
+				end)
+
+				return Slider
+			end
+
+			function SectionFunction:AddButton(ButtonConfig)
+				ButtonConfig = ButtonConfig or {}
+				ButtonConfig.Name = ButtonConfig.Name or "Button"
+				ButtonConfig.Callback = ButtonConfig.Callback or function() end
+
+				local ButtonFrame = Create("TextButton", {
+					Name = "Button",
+					Size = UDim2.new(1, 0, 0, 40),
+					BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+					BorderSizePixel = 0,
+					Text = "",
+					Parent = SectionFrame.SectionContent
+				}, {
+					Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
+					Create("UIStroke", {
+						Color = NineNexusLib.Themes.Default.Stroke,
+						Thickness = 1
+					}),
+					Create("TextLabel", {
+						Name = "Label",
+						Size = UDim2.new(1, -40, 1, 0),
+						Position = UDim2.new(0, 15, 0, 0),
+						BackgroundTransparency = 1,
+						Text = ButtonConfig.Name,
+						TextColor3 = NineNexusLib.Themes.Default.Text,
+						TextSize = 14,
+						Font = Enum.Font.GothamSemibold,
+						TextXAlignment = Enum.TextXAlignment.Left
+					}),
+					Create("ImageLabel", {
+						Name = "Icon",
+						Size = UDim2.new(0, 18, 0, 18),
+						Position = UDim2.new(1, -30, 0.5, 0),
+						AnchorPoint = Vector2.new(0, 0.5),
+						BackgroundTransparency = 1,
+						Image = GetIcon("play"),
+						ImageColor3 = NineNexusLib.Themes.Default.TextDark
+					})
 				})
 
-				local ColorpickerBox = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 6), {
-					Size = UDim2.new(0, 28, 0, 28),
-					Position = UDim2.new(1, -40, 0.5, -14),
-					AnchorPoint = Vector2.new(0, 0),
-					BackgroundColor3 = ColorpickerConfig.Default
-				}), {
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke")
-				}), "Main")
-
-				local ColorpickerFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
-					Size = UDim2.new(1, 0, 0, 46),
-					Parent = ItemParent
-				}), {
-					SetProps(SetChildren(MakeElement("TFrame"), {
-						AddThemeObject(SetProps(MakeElement("Label", ColorpickerConfig.Name, 16), {
-							Size = UDim2.new(1, -80, 1, 0),
-							Position = UDim2.new(0, 20, 0, 0),
-							Font = Enum.Font.GothamBold,
-							Name = "Content",
-							TextYAlignment = Enum.TextYAlignment.Center
-						}), "Text"),
-						ColorpickerBox,
-						Click,
-						AddThemeObject(SetProps(MakeElement("Frame"), {
-							Size = UDim2.new(1, 0, 0, 1.5),
-							Position = UDim2.new(0, 0, 1, -1.5),
-							Name = "Line",
-							Visible = false
-						}), "Stroke"), 
-					}), {
-						Size = UDim2.new(1, 0, 0, 46),
-						ClipsDescendants = true,
-						Name = "F"
-					}),
-					ColorpickerContainer,
-					AddThemeObject(MakeElement("Stroke", NineNexusLib.Themes.Default.Stroke, 1.5), "Stroke"),
-				}), "Second")
-
-				AddConnection(Click.MouseButton1Click, function()
-					Colorpicker.Toggled = not Colorpicker.Toggled
-					TweenService:Create(ColorpickerFrame, TweenInfo.new(.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = Colorpicker.Toggled and UDim2.new(1, 0, 0, 160) or UDim2.new(1, 0, 0, 46)}):Play()
-					Color.Visible = Colorpicker.Toggled
-					Hue.Visible = Colorpicker.Toggled
-					ColorpickerFrame.F.Line.Visible = Colorpicker.Toggled
+				AddConnection(ButtonFrame.MouseButton1Click, function()
+					ButtonConfig.Callback()
 				end)
 
-				local function UpdateColorPicker()
-					ColorpickerBox.BackgroundColor3 = Color3.fromHSV(ColorH, ColorS, ColorV)
-					Color.BackgroundColor3 = Color3.fromHSV(ColorH, 1, 1)
-					Colorpicker:Set(ColorpickerBox.BackgroundColor3)
-					ColorpickerConfig.Callback(ColorpickerBox.BackgroundColor3)
-					SaveCfg(game.GameId)
-				end
-
-				ColorH = 1 - (math.clamp(HueSelection.AbsolutePosition.Y - Hue.AbsolutePosition.Y, 0, Hue.AbsoluteSize.Y) / Hue.AbsoluteSize.Y)
-				ColorS = (math.clamp(ColorSelection.AbsolutePosition.X - Color.AbsolutePosition.X, 0, Color.AbsoluteSize.X) / Color.AbsoluteSize.X)
-				ColorV = 1 - (math.clamp(ColorSelection.AbsolutePosition.Y - Color.AbsolutePosition.Y, 0, Color.AbsoluteSize.Y) / Color.AbsoluteSize.Y)
-
-				AddConnection(Color.InputBegan, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						if ColorInput then
-							ColorInput:Disconnect()
-						end
-						ColorInput = AddConnection(RunService.RenderStepped, function()
-							local ColorX = (math.clamp(Mouse.X - Color.AbsolutePosition.X, 0, Color.AbsoluteSize.X) / Color.AbsoluteSize.X)
-							local ColorY = (math.clamp(Mouse.Y - Color.AbsolutePosition.Y, 0, Color.AbsoluteSize.Y) / Color.AbsoluteSize.Y)
-							ColorSelection.Position = UDim2.new(ColorX, 0, ColorY, 0)
-							ColorS = ColorX
-							ColorV = 1 - ColorY
-							UpdateColorPicker()
-						end)
-					end
+				-- Hover эффекты
+				AddConnection(ButtonFrame.MouseEnter, function()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+						BackgroundColor3 = Color3.fromRGB(
+							NineNexusLib.Themes.Default.Second.R * 255 + 10,
+							NineNexusLib.Themes.Default.Second.G * 255 + 10,
+							NineNexusLib.Themes.Default.Second.B * 255 + 10
+						)
+					}):Play()
 				end)
 
-				AddConnection(Color.InputEnded, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						if ColorInput then
-							ColorInput:Disconnect()
-						end
-					end
+				AddConnection(ButtonFrame.MouseLeave, function()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+						BackgroundColor3 = NineNexusLib.Themes.Default.Second
+					}):Play()
 				end)
 
-				AddConnection(Hue.InputBegan, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						if HueInput then
-							HueInput:Disconnect()
-						end;
-
-						HueInput = AddConnection(RunService.RenderStepped, function()
-							local HueY = (math.clamp(Mouse.Y - Hue.AbsolutePosition.Y, 0, Hue.AbsoluteSize.Y) / Hue.AbsoluteSize.Y)
-
-							HueSelection.Position = UDim2.new(0.5, 0, HueY, 0)
-							ColorH = 1 - HueY
-
-							UpdateColorPicker()
-						end)
-					end
-				end)
-
-				AddConnection(Hue.InputEnded, function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						if HueInput then
-							HueInput:Disconnect()
-						end
-					end
-				end)
-
-				function Colorpicker:Set(Value)
-					Colorpicker.Value = Value
-					ColorpickerBox.BackgroundColor3 = Colorpicker.Value
-					ColorpickerConfig.Callback(Colorpicker.Value)
-				end
-
-				Colorpicker:Set(Colorpicker.Value)
-				if ColorpickerConfig.Flag then				
-					NineNexusLib.Flags[ColorpickerConfig.Flag] = Colorpicker
-				end
-				return Colorpicker
-			end  
-			return ElementFunction   
-		end	
-
-		local ElementFunction = {}
-
-		function ElementFunction:AddSection(SectionConfig)
-			SectionConfig.Name = SectionConfig.Name or "Section"
-
-			local SectionFrame = SetChildren(SetProps(MakeElement("TFrame"), {
-				Size = UDim2.new(1, 0, 0, 32),
-				Parent = Container
-			}), {
-				AddThemeObject(SetProps(MakeElement("Label", SectionConfig.Name, 16), {
-					Size = UDim2.new(1, -20, 0, 18),
-					Position = UDim2.new(0, 0, 0, 4),
-					Font = Enum.Font.GothamBold,
-					TextColor3 = NineNexusLib.Themes.Default.Accent
-				}), "TextDark"),
-				SetChildren(SetProps(MakeElement("TFrame"), {
-					AnchorPoint = Vector2.new(0, 0),
-					Size = UDim2.new(1, 0, 1, -28),
-					Position = UDim2.new(0, 0, 0, 28),
-					Name = "Holder"
-				}), {
-					MakeElement("List", 0, 8)
-				}),
-			})
-
-			AddConnection(SectionFrame.Holder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
-				SectionFrame.Size = UDim2.new(1, 0, 0, SectionFrame.Holder.UIListLayout.AbsoluteContentSize.Y + 36)
-				SectionFrame.Holder.Size = UDim2.new(1, 0, 0, SectionFrame.Holder.UIListLayout.AbsoluteContentSize.Y)
-			end)
-
-			local SectionFunction = {}
-			for i, v in next, GetElements(SectionFrame.Holder) do
-				SectionFunction[i] = v 
+				return ButtonFrame
 			end
+
+			function SectionFunction:AddDropdown(DropdownConfig)
+				DropdownConfig = DropdownConfig or {}
+				DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
+				DropdownConfig.Options = DropdownConfig.Options or {"Option 1", "Option 2", "Option 3"}
+				DropdownConfig.Default = DropdownConfig.Default or DropdownConfig.Options[1]
+				DropdownConfig.Callback = DropdownConfig.Callback or function() end
+
+				local Dropdown = {Value = DropdownConfig.Default, Options = DropdownConfig.Options, Open = false}
+
+				local DropdownFrame = Create("Frame", {
+					Name = "Dropdown",
+					Size = UDim2.new(1, 0, 0, 45),
+					BackgroundColor3 = NineNexusLib.Themes.Default.Second,
+					BorderSizePixel = 0,
+					Parent = SectionFrame.SectionContent
+				}, {
+					Create("UICorner", {CornerRadius = UDim.new(0, 8)}),
+					Create("UIStroke", {
+						Color = NineNexusLib.Themes.Default.Stroke,
+						Thickness = 1
+					}),
+					Create("TextLabel", {
+						Name = "Label",
+						Size = UDim2.new(1, -120, 1, 0),
+						Position = UDim2.new(0, 15, 0, 0),
+						BackgroundTransparency = 1,
+						Text = DropdownConfig.Name,
+						TextColor3 = NineNexusLib.Themes.Default.Text,
+						TextSize = 14,
+						Font = Enum.Font.GothamSemibold,
+						TextXAlignment = Enum.TextXAlignment.Left
+					}),
+					Create("TextButton", {
+						Name = "DropdownButton",
+						Size = UDim2.new(0, 100, 0, 30),
+						Position = UDim2.new(1, -110, 0.5, 0),
+						AnchorPoint = Vector2.new(0, 0.5),
+						BackgroundColor3 = NineNexusLib.Themes.Default.Stroke,
+						BorderSizePixel = 0,
+						Text = ""
+					}, {
+						Create("UICorner", {CornerRadius = UDim.new(0, 6)}),
+						Create("TextLabel", {
+							Name = "Value",
+							Size = UDim2.new(1, -25, 1, 0),
+							Position = UDim2.new(0, 8, 0, 0),
+							BackgroundTransparency = 1,
+							Text = DropdownConfig.Default,
+							TextColor3 = NineNexusLib.Themes.Default.Text,
+							TextSize = 12,
+							Font = Enum.Font.Gotham,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextTruncate = Enum.TextTruncate.AtEnd
+						}),
+						Create("ImageLabel", {
+							Name = "Arrow",
+							Size = UDim2.new(0, 12, 0, 12),
+							Position = UDim2.new(1, -18, 0.5, 0),
+							AnchorPoint = Vector2.new(0, 0.5),
+							BackgroundTransparency = 1,
+							Image = GetIcon("chevron-down"),
+							ImageColor3 = NineNexusLib.Themes.Default.TextDark
+						})
+					}),
+					Create("Frame", {
+						Name = "DropdownList",
+						Size = UDim2.new(0, 100, 0, 0),
+						Position = UDim2.new(1, -110, 1, 5),
+						BackgroundColor3 = NineNexusLib.Themes.Default.Main,
+						BorderSizePixel = 0,
+						Visible = false,
+						ZIndex = 10
+					}, {
+						Create("UICorner", {CornerRadius = UDim.new(0, 6)}),
+						Create("UIStroke", {
+							Color = NineNexusLib.Themes.Default.Stroke,
+							Thickness = 1
+						}),
+						Create("UIListLayout", {
+							SortOrder = Enum.SortOrder.LayoutOrder
+						})
+					})
+				})
+
+				-- Создание опций
+				for _, Option in pairs(DropdownConfig.Options) do
+					local OptionButton = Create("TextButton", {
+						Name = "Option",
+						Size = UDim2.new(1, 0, 0, 25),
+						BackgroundTransparency = 1,
+						Text = "",
+						Parent = DropdownFrame.DropdownList
+					}, {
+						Create("TextLabel", {
+							Size = UDim2.new(1, -10, 1, 0),
+							Position = UDim2.new(0, 8, 0, 0),
+							BackgroundTransparency = 1,
+							Text = Option,
+							TextColor3 = NineNexusLib.Themes.Default.Text,
+							TextSize = 12,
+							Font = Enum.Font.Gotham,
+							TextXAlignment = Enum.TextXAlignment.Left
+						})
+					})
+
+					AddConnection(OptionButton.MouseButton1Click, function()
+						Dropdown:Set(Option)
+						Dropdown:Toggle()
+					end)
+
+					AddConnection(OptionButton.MouseEnter, function()
+						OptionButton.BackgroundTransparency = 0.9
+					end)
+
+					AddConnection(OptionButton.MouseLeave, function()
+						OptionButton.BackgroundTransparency = 1
+					end)
+				end
+
+				function Dropdown:Set(Value)
+					self.Value = Value
+					DropdownFrame.DropdownButton.Value.Text = Value
+					DropdownConfig.Callback(Value)
+				end
+
+				function Dropdown:Toggle()
+					self.Open = not self.Open
+					DropdownFrame.DropdownList.Visible = self.Open
+					
+					if self.Open then
+						DropdownFrame.DropdownList.Size = UDim2.new(0, 100, 0, #DropdownConfig.Options * 25)
+					end
+					
+					TweenService:Create(DropdownFrame.DropdownButton.Arrow, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+						Rotation = self.Open and 180 or 0
+					}):Play()
+				end
+
+				AddConnection(DropdownFrame.DropdownButton.MouseButton1Click, function()
+					Dropdown:Toggle()
+				end)
+
+				return Dropdown
+			end
+
 			return SectionFunction
-		end	
-
-		for i, v in next, GetElements(Container) do
-			ElementFunction[i] = v 
 		end
 
-		if TabConfig.PremiumOnly then
-			for i, v in next, ElementFunction do
-				ElementFunction[i] = function() end
-			end    
-			Container:FindFirstChild("UIListLayout"):Destroy()
-			Container:FindFirstChild("UIPadding"):Destroy()
-			SetChildren(SetProps(MakeElement("TFrame"), {
-				Size = UDim2.new(1, 0, 1, 0),
-				Parent = Container
-			}), {
-				AddThemeObject(SetProps(MakeElement("Image", GetIcon("lock") or "rbxassetid://7072706796"), {
-					Size = UDim2.new(0, 24, 0, 24),
-					Position = UDim2.new(0, 20, 0, 20),
-					ImageTransparency = 0.4,
-					ImageColor3 = NineNexusLib.Themes.Default.TextDark
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "Premium Access Required", 18), {
-					Size = UDim2.new(1, -50, 0, 18),
-					Position = UDim2.new(0, 50, 0, 24),
-					TextTransparency = 0.1,
-					Font = Enum.Font.GothamBold
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Image", GetIcon("shield") or "rbxassetid://7072706796"), {
-					Size = UDim2.new(0, 64, 0, 64),
-					Position = UDim2.new(0, 90, 0, 120),
-					ImageColor3 = NineNexusLib.Themes.Default.Accent
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "Premium Features", 16), {
-					Size = UDim2.new(1, -170, 0, 18),
-					Position = UDim2.new(0, 170, 0, 124),
-					Font = Enum.Font.GothamBold
-				}), "Text"),
-				AddThemeObject(SetProps(MakeElement("Label", "This section contains premium features. Get premium access in our Discord server to unlock all features.", 14), {
-					Size = UDim2.new(1, -220, 0, 40),
-					Position = UDim2.new(0, 170, 0, 150),
-					TextWrapped = true,
-					TextTransparency = 0.4,
-					Font = Enum.Font.GothamMedium
-				}), "Text")
-			})
-		end
-		return ElementFunction   
-	end  
-	
+		return ElementFunction
+	end
+
+	-- Показ уведомления о загрузке
 	NineNexusLib:MakeNotification({
-		Name = "NineNexus Library",
-		Content = "Successfully initialized with enhanced UI and features!",
-		Image = "zap",
-		Time = 6
+		Name = "NineNexus",
+		Content = "Interface loaded successfully!",
+		Image = "check-circle",
+		Time = 3
 	})
-	
+
 	return TabFunction
-end   
+end
 
 function NineNexusLib:Destroy()
 	NineNexus:Destroy()
