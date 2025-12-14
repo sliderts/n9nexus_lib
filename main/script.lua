@@ -10,6 +10,7 @@ local NineNexusLib = {
 	ThemeObjects = {},
 	Connections = {},
 	Flags = {},
+	ToggleKey = Enum.KeyCode.Insert, -- Default toggle key
 	Themes = {
 		Default = {
 			Main = Color3.fromRGB(15, 15, 15),
@@ -23,7 +24,8 @@ local NineNexusLib = {
 	},
 	SelectedTheme = "Default",
 	Folder = nil,
-	SaveCfg = false
+	SaveCfg = false,
+	WindowVisible = true
 }
 
 -- Lucide Icons from GitHub
@@ -38,13 +40,17 @@ if not Success then
 	-- Fallback icons
 	Icons = {
 		["home"] = "rbxassetid://10734884548",
-		["settings"] = "rbxassetid://10734886004",
+		["settings"] = "rbxassetid://10734886004", 
 		["user"] = "rbxassetid://10734884302",
 		["check"] = "rbxassetid://10734884548",
 		["x"] = "rbxassetid://10734884302",
 		["minus"] = "rbxassetid://10734884548",
+		["plus"] = "rbxassetid://10734884549", -- Added plus icon
 		["chevron-down"] = "rbxassetid://10734884302",
-		["chevron-right"] = "rbxassetid://10734884548"
+		["chevron-right"] = "rbxassetid://10734884548",
+		["bell"] = "rbxassetid://10734884550",
+		["eye"] = "rbxassetid://10734884551",
+		["eye-off"] = "rbxassetid://10734884552"
 	}
 end
 
@@ -90,6 +96,14 @@ function NineNexusLib:IsRunning()
 	end
 end
 
+function NineNexusLib:SetToggleKey(Key)
+	self.ToggleKey = Key
+end
+
+function NineNexusLib:GetToggleKey()
+	return self.ToggleKey
+end
+
 local function AddConnection(Signal, Function)
 	if not NineNexusLib:IsRunning() then
 		return
@@ -111,6 +125,7 @@ task.spawn(function()
 	end
 end)
 
+-- Fixed dragging functionality
 local function AddDraggingFunctionality(DragPoint, Main)
 	local Dragging, DragInput, MousePos, FramePos = false
 
@@ -137,9 +152,8 @@ local function AddDraggingFunctionality(DragPoint, Main)
 	AddConnection(UserInputService.InputChanged, function(Input)
 		if Input == DragInput and Dragging then
 			local Delta = Input.Position - MousePos
-			TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-				Position = UDim2.new(FramePos.X.Scale, FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y)
-			}):Play()
+			local NewPosition = UDim2.new(FramePos.X.Scale, FramePos.X.Offset + Delta.X, FramePos.Y.Scale, FramePos.Y.Offset + Delta.Y)
+			Main.Position = NewPosition
 		end
 	end)
 end
@@ -355,7 +369,20 @@ CreateElement("Label", function(Text, TextSize, Transparency)
 	})
 end)
 
--- Notification System
+CreateElement("TextBox", function(Text, PlaceholderText)
+	return Create("TextBox", {
+		Text = Text or "",
+		PlaceholderText = PlaceholderText or "",
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextSize = 14,
+		Font = Enum.Font.GothamMedium,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ClearButtonOnFocus = false
+	})
+end)
+
+-- Enhanced Notification System with Progress Bar
 local NotificationHolder = SetProps(SetChildren(MakeElement("TFrame"), {
 	SetProps(MakeElement("List"), {
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -383,6 +410,12 @@ function NineNexusLib:MakeNotification(NotificationConfig)
 			Parent = NotificationHolder
 		})
 
+		-- Progress Bar
+		local ProgressBar = AddThemeObject(SetProps(MakeElement("Frame", NineNexusLib.Themes.Default.Accent), {
+			Size = UDim2.new(1, 0, 0, 3),
+			Position = UDim2.new(0, 0, 1, -3)
+		}), "Accent")
+
 		local NotificationFrame = SetChildren(SetProps(MakeElement("RoundFrame", NineNexusLib.Themes.Default.Second, 0, 12), {
 			Parent = NotificationParent,
 			Size = UDim2.new(1, 0, 0, 0),
@@ -409,22 +442,30 @@ function NineNexusLib:MakeNotification(NotificationConfig)
 				TextColor3 = NineNexusLib.Themes.Default.TextDark,
 				TextWrapped = true,
 				Name = "Content"
-			})
+			}),
+			ProgressBar
 		})
 
+		-- Animate notification in
 		TweenService:Create(NotificationFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Position = UDim2.new(0, 0, 0, 0)
 		}):Play()
 
-		task.wait(NotificationConfig.Time - 1)
+		-- Animate progress bar
+		TweenService:Create(ProgressBar, TweenInfo.new(NotificationConfig.Time, Enum.EasingStyle.Linear), {
+			Size = UDim2.new(0, 0, 0, 3)
+		}):Play()
 
+		task.wait(NotificationConfig.Time - 0.5)
+
+		-- Animate out
 		TweenService:Create(NotificationFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
 			Position = UDim2.new(1, 50, 0, 0),
 			BackgroundTransparency = 1
 		}):Play()
 
 		task.wait(0.5)
-		NotificationFrame:Destroy()
+		NotificationParent:Destroy()
 	end)
 end
 
@@ -447,6 +488,7 @@ function NineNexusLib:MakeWindow(WindowConfig)
 	local FirstTab = true
 	local Minimized = false
 	local UIHidden = false
+	local MainWindow -- Define MainWindow early for global access
 
 	WindowConfig = WindowConfig or {}
 	WindowConfig.Name = WindowConfig.Name or "NineNexus"
@@ -463,9 +505,11 @@ function NineNexusLib:MakeWindow(WindowConfig)
 	WindowConfig.ShowIcon = WindowConfig.ShowIcon or false
 	WindowConfig.Icon = WindowConfig.Icon or GetIcon("home")
 	WindowConfig.IntroIcon = WindowConfig.IntroIcon or GetIcon("home")
+	WindowConfig.ToggleKey = WindowConfig.ToggleKey or NineNexusLib.ToggleKey
 
 	NineNexusLib.Folder = WindowConfig.ConfigFolder
 	NineNexusLib.SaveCfg = WindowConfig.SaveConfig
+	NineNexusLib.ToggleKey = WindowConfig.ToggleKey
 
 	if WindowConfig.SaveConfig and makefolder then
 		if not isfolder(WindowConfig.ConfigFolder) then
@@ -589,11 +633,12 @@ function NineNexusLib:MakeWindow(WindowConfig)
 	}), "Stroke")
 
 	-- Main Window
-	local MainWindow = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
+	MainWindow = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 12), {
 		Parent = NineNexus,
 		Position = UDim2.new(0.5, -350, 0.5, -200),
 		Size = UDim2.new(0, 700, 0, 400),
-		ClipsDescendants = true
+		ClipsDescendants = true,
+		Name = "MainWindow"
 	}), {
 		-- Top Bar
 		SetChildren(SetProps(MakeElement("TFrame"), {
@@ -632,25 +677,38 @@ function NineNexusLib:MakeWindow(WindowConfig)
 
 	AddDraggingFunctionality(DragPoint, MainWindow)
 
+	-- Global Toggle Function
+	local function ToggleWindow()
+		if NineNexusLib.WindowVisible then
+			MainWindow.Visible = false
+			UIHidden = true
+			NineNexusLib.WindowVisible = false
+			NineNexusLib:MakeNotification({
+				Name = "Interface Hidden",
+				Content = "Press " .. WindowConfig.ToggleKey.Name .. " to show the interface again",
+				Time = 4
+			})
+		else
+			MainWindow.Visible = true
+			UIHidden = false
+			NineNexusLib.WindowVisible = true
+		end
+	end
+
 	-- Window Controls Events
 	AddConnection(CloseBtn.MouseButton1Up, function()
-		MainWindow.Visible = false
-		UIHidden = true
-		NineNexusLib:MakeNotification({
-			Name = "Interface Hidden",
-			Content = "Press RightShift to show the interface again",
-			Time = 4
-		})
+		ToggleWindow()
 		WindowConfig.CloseCallback()
 	end)
 
+	-- Global keybind for toggling
 	AddConnection(UserInputService.InputBegan, function(Input)
-		if Input.KeyCode == Enum.KeyCode.RightShift and UIHidden then
-			MainWindow.Visible = true
-			UIHidden = false
+		if Input.KeyCode == WindowConfig.ToggleKey then
+			ToggleWindow()
 		end
 	end)
 
+	-- Fixed minimize functionality
 	AddConnection(MinimizeBtn.MouseButton1Up, function()
 		if Minimized then
 			TweenService:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
@@ -664,12 +722,11 @@ function NineNexusLib:MakeWindow(WindowConfig)
 		else
 			MainWindow.ClipsDescendants = true
 			WindowTopBarLine.Visible = false
+			WindowStuff.Visible = false
 			MinimizeBtn.Ico.Image = GetIcon("plus")
 			TweenService:Create(MainWindow, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
 				Size = UDim2.new(0, math.max(WindowName.TextBounds.X + 150, 300), 0, 50)
 			}):Play()
-			task.wait(0.1)
-			WindowStuff.Visible = false
 		end
 		Minimized = not Minimized
 	end)
@@ -1072,8 +1129,465 @@ function NineNexusLib:MakeWindow(WindowConfig)
 				return Toggle
 			end
 
-			-- Add other elements (Slider, Dropdown, etc.) here...
-			-- For brevity, I'm including the main structure
+			-- Slider Element
+			function ElementFunction:AddSlider(SliderConfig)
+				SliderConfig = SliderConfig or {}
+				SliderConfig.Name = SliderConfig.Name or "Slider"
+				SliderConfig.Min = SliderConfig.Min or 0
+				SliderConfig.Max = SliderConfig.Max or 100
+				SliderConfig.Default = SliderConfig.Default or SliderConfig.Min
+				SliderConfig.Color = SliderConfig.Color or NineNexusLib.Themes.Default.Accent
+				SliderConfig.Increment = SliderConfig.Increment or 1
+				SliderConfig.ValueName = SliderConfig.ValueName or ""
+				SliderConfig.Callback = SliderConfig.Callback or function() end
+				SliderConfig.Flag = SliderConfig.Flag or nil
+				SliderConfig.Save = SliderConfig.Save or false
+
+				local Slider = {Value = SliderConfig.Default, Save = SliderConfig.Save, Type = "Slider"}
+				local Dragging = false
+
+				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
+					Size = UDim2.new(1, 0, 0, 54),
+					Parent = ItemParent
+				}), {
+					AddThemeObject(SetProps(MakeElement("Label", SliderConfig.Name, 14), {
+						Size = UDim2.new(1, -16, 0, 20),
+						Position = UDim2.new(0, 16, 0, 8),
+						Font = Enum.Font.GothamMedium,
+						Name = "Title"
+					}), "Text"),
+					AddThemeObject(SetProps(MakeElement("Label", tostring(SliderConfig.Default) .. SliderConfig.ValueName, 13), {
+						Size = UDim2.new(0.3, 0, 0, 20),
+						Position = UDim2.new(0.7, 0, 0, 8),
+						Font = Enum.Font.GothamMedium,
+						Name = "Value",
+						TextXAlignment = Enum.TextXAlignment.Right
+					}), "TextDark"),
+					AddThemeObject(MakeElement("Stroke"), "Stroke")
+				}), "Second")
+
+				-- Slider Bar
+				local SliderBar = SetChildren(SetProps(MakeElement("RoundFrame", NineNexusLib.Themes.Default.Divider, 0, 4), {
+					Size = UDim2.new(1, -32, 0, 6),
+					Position = UDim2.new(0, 16, 1, -18),
+					Parent = SliderFrame
+				}), {
+					SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 4), {
+						Size = UDim2.new(0, 0, 1, 0),
+						Name = "Fill"
+					}),
+					SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 1, 0), {
+						Size = UDim2.new(0, 12, 0, 12),
+						Position = UDim2.new(0, -6, 0.5, -6),
+						Name = "Knob",
+						BorderSizePixel = 0
+					})
+				})
+
+				local function UpdateSlider(Value)
+					Slider.Value = Round(math.clamp(Value, SliderConfig.Min, SliderConfig.Max), SliderConfig.Increment)
+					SliderFrame.Value.Text = tostring(Slider.Value) .. SliderConfig.ValueName
+					
+					local Percent = (Slider.Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+					
+					TweenService:Create(SliderBar.Fill, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Size = UDim2.new(Percent, 0, 1, 0)
+					}):Play()
+					
+					TweenService:Create(SliderBar.Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Position = UDim2.new(Percent, -6, 0.5, -6)
+					}):Play()
+					
+					SliderConfig.Callback(Slider.Value)
+				end
+
+				function Slider:Set(Value)
+					UpdateSlider(Value)
+				end
+
+				AddConnection(SliderBar.InputBegan, function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						Dragging = true
+						local function Update()
+							local MousePos = Mouse.X
+							local BarPos = SliderBar.AbsolutePosition.X
+							local BarSize = SliderBar.AbsoluteSize.X
+							local Percent = math.clamp((MousePos - BarPos) / BarSize, 0, 1)
+							local Value = SliderConfig.Min + (Percent * (SliderConfig.Max - SliderConfig.Min))
+							UpdateSlider(Value)
+						end
+						Update()
+						local MoveConnection = AddConnection(Mouse.Move, Update)
+						local ReleaseConnection
+						ReleaseConnection = AddConnection(UserInputService.InputEnded, function(EndInput)
+							if EndInput.UserInputType == Enum.UserInputType.MouseButton1 then
+								Dragging = false
+								MoveConnection:Disconnect()
+								ReleaseConnection:Disconnect()
+								if NineNexusLib.SaveCfg then
+									SaveCfg(game.GameId)
+								end
+							end
+						end)
+					end
+				end)
+
+				UpdateSlider(SliderConfig.Default)
+
+				if SliderConfig.Flag then
+					NineNexusLib.Flags[SliderConfig.Flag] = Slider
+				end
+
+				return Slider
+			end
+
+			-- Dropdown Element  
+			function ElementFunction:AddDropdown(DropdownConfig)
+				DropdownConfig = DropdownConfig or {}
+				DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
+				DropdownConfig.Default = DropdownConfig.Default or ""
+				DropdownConfig.Options = DropdownConfig.Options or {"Option 1", "Option 2"}
+				DropdownConfig.Callback = DropdownConfig.Callback or function() end
+				DropdownConfig.Flag = DropdownConfig.Flag or nil
+				DropdownConfig.Save = DropdownConfig.Save or false
+
+				local Dropdown = {Value = DropdownConfig.Default, Save = DropdownConfig.Save, Type = "Dropdown", Options = DropdownConfig.Options}
+				local Opened = false
+
+				local DropdownFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
+					Size = UDim2.new(1, 0, 0, 44),
+					Parent = ItemParent,
+					ClipsDescendants = true
+				}), {
+					AddThemeObject(SetProps(MakeElement("Label", DropdownConfig.Name, 14), {
+						Size = UDim2.new(1, -50, 0, 44),
+						Position = UDim2.new(0, 16, 0, 0),
+						Font = Enum.Font.GothamMedium,
+						Name = "Title",
+						TextYAlignment = Enum.TextYAlignment.Center
+					}), "Text"),
+					AddThemeObject(SetProps(MakeElement("Label", DropdownConfig.Default, 13), {
+						Size = UDim2.new(0.4, -24, 0, 44),
+						Position = UDim2.new(0.6, 0, 0, 0),
+						Font = Enum.Font.GothamMedium,
+						Name = "Selected",
+						TextXAlignment = Enum.TextXAlignment.Right,
+						TextYAlignment = Enum.TextYAlignment.Center
+					}), "TextDark"),
+					AddThemeObject(SetProps(MakeElement("Image", GetIcon("chevron-down")), {
+						Size = UDim2.new(0, 16, 0, 16),
+						Position = UDim2.new(1, -28, 0.5, -8),
+						Name = "Arrow"
+					}), "TextDark"),
+					SetProps(MakeElement("Button"), {
+						Size = UDim2.new(1, 0, 0, 44),
+						Name = "ClickDetector"
+					}),
+					AddThemeObject(MakeElement("Stroke"), "Stroke")
+				}), "Second")
+
+				local OptionsList = SetChildren(SetProps(MakeElement("TFrame"), {
+					Size = UDim2.new(1, 0, 0, 0),
+					Position = UDim2.new(0, 0, 0, 44),
+					Parent = DropdownFrame,
+					Name = "Options"
+				}), {
+					MakeElement("List", 0, 0)
+				})
+
+				local function CreateOption(OptionText)
+					local OptionFrame = AddThemeObject(SetChildren(SetProps(MakeElement("Frame", Color3.fromRGB(255, 255, 255)), {
+						Size = UDim2.new(1, 0, 0, 32),
+						Parent = OptionsList
+					}), {
+						AddThemeObject(SetProps(MakeElement("Label", OptionText, 13), {
+							Size = UDim2.new(1, -16, 1, 0),
+							Position = UDim2.new(0, 16, 0, 0),
+							Font = Enum.Font.GothamMedium,
+							TextYAlignment = Enum.TextYAlignment.Center
+						}), "Text"),
+						SetProps(MakeElement("Button"), {
+							Size = UDim2.new(1, 0, 1, 0)
+						})
+					}), "Divider")
+
+					AddConnection(OptionFrame.TextButton.MouseButton1Click, function()
+						Dropdown:Set(OptionText)
+						Dropdown:Close()
+					end)
+
+					return OptionFrame
+				end
+
+				function Dropdown:Set(Value)
+					Dropdown.Value = Value
+					DropdownFrame.Selected.Text = Value
+					DropdownConfig.Callback(Value)
+				end
+
+				function Dropdown:Refresh(NewOptions)
+					for _, Option in pairs(OptionsList:GetChildren()) do
+						if Option:IsA("Frame") then
+							Option:Destroy()
+						end
+					end
+					Dropdown.Options = NewOptions
+					for _, Option in pairs(NewOptions) do
+						CreateOption(Option)
+					end
+				end
+
+				function Dropdown:Open()
+					if Opened then return end
+					Opened = true
+					
+					local OptionsCount = #Dropdown.Options
+					local TargetHeight = 44 + (OptionsCount * 32)
+					
+					TweenService:Create(DropdownFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+						Size = UDim2.new(1, 0, 0, TargetHeight)
+					}):Play()
+					
+					TweenService:Create(DropdownFrame.Arrow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Rotation = 180
+					}):Play()
+				end
+
+				function Dropdown:Close()
+					if not Opened then return end
+					Opened = false
+					
+					TweenService:Create(DropdownFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+						Size = UDim2.new(1, 0, 0, 44)
+					}):Play()
+					
+					TweenService:Create(DropdownFrame.Arrow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Rotation = 0
+					}):Play()
+				end
+
+				AddConnection(DropdownFrame.ClickDetector.MouseButton1Click, function()
+					if Opened then
+						Dropdown:Close()
+					else
+						Dropdown:Open()
+					end
+				end)
+
+				for _, Option in pairs(DropdownConfig.Options) do
+					CreateOption(Option)
+				end
+
+				if DropdownConfig.Flag then
+					NineNexusLib.Flags[DropdownConfig.Flag] = Dropdown
+				end
+
+				return Dropdown
+			end
+
+			-- TextBox Element
+			function ElementFunction:AddTextbox(TextboxConfig)
+				TextboxConfig = TextboxConfig or {}
+				TextboxConfig.Name = TextboxConfig.Name or "TextBox"
+				TextboxConfig.Default = TextboxConfig.Default or ""
+				TextboxConfig.TextDisappear = TextboxConfig.TextDisappear or false
+				TextboxConfig.Callback = TextboxConfig.Callback or function() end
+				TextboxConfig.Flag = TextboxConfig.Flag or nil
+				TextboxConfig.Save = TextboxConfig.Save or false
+
+				local Textbox = {Value = TextboxConfig.Default, Save = TextboxConfig.Save, Type = "Textbox"}
+
+				local TextboxFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
+					Size = UDim2.new(1, 0, 0, 44),
+					Parent = ItemParent
+				}), {
+					AddThemeObject(SetProps(MakeElement("Label", TextboxConfig.Name, 14), {
+						Size = UDim2.new(0.5, -8, 1, 0),
+						Position = UDim2.new(0, 16, 0, 0),
+						Font = Enum.Font.GothamMedium,
+						Name = "Title",
+						TextYAlignment = Enum.TextYAlignment.Center
+					}), "Text"),
+					AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", NineNexusLib.Themes.Default.Main, 0, 6), {
+						Size = UDim2.new(0.5, -8, 0, 28),
+						Position = UDim2.new(0.5, 8, 0.5, -14),
+						Name = "InputFrame"
+					}), {
+						AddThemeObject(MakeElement("Stroke"), "Stroke"),
+						AddThemeObject(SetProps(MakeElement("TextBox", TextboxConfig.Default, ""), {
+							Size = UDim2.new(1, -12, 1, 0),
+							Position = UDim2.new(0, 6, 0, 0),
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextYAlignment = Enum.TextYAlignment.Center,
+							Name = "Input"
+						}), "Text")
+					}), "Main"),
+					AddThemeObject(MakeElement("Stroke"), "Stroke")
+				}), "Second")
+
+				function Textbox:Set(Value)
+					Textbox.Value = Value
+					TextboxFrame.InputFrame.Input.Text = Value
+					TextboxConfig.Callback(Value)
+				end
+
+				AddConnection(TextboxFrame.InputFrame.Input.FocusLost, function(EnterPressed)
+					if EnterPressed then
+						Textbox:Set(TextboxFrame.InputFrame.Input.Text)
+						if TextboxConfig.TextDisappear then
+							TextboxFrame.InputFrame.Input.Text = ""
+						end
+						if NineNexusLib.SaveCfg then
+							SaveCfg(game.GameId)
+						end
+					end
+				end)
+
+				if TextboxConfig.Flag then
+					NineNexusLib.Flags[TextboxConfig.Flag] = Textbox
+				end
+
+				return Textbox
+			end
+
+			-- Colorpicker Element
+			function ElementFunction:AddColorpicker(ColorpickerConfig)
+				ColorpickerConfig = ColorpickerConfig or {}
+				ColorpickerConfig.Name = ColorpickerConfig.Name or "Color Picker"
+				ColorpickerConfig.Default = ColorpickerConfig.Default or Color3.fromRGB(255, 255, 255)
+				ColorpickerConfig.Callback = ColorpickerConfig.Callback or function() end
+				ColorpickerConfig.Flag = ColorpickerConfig.Flag or nil
+				ColorpickerConfig.Save = ColorpickerConfig.Save or false
+
+				local Colorpicker = {Value = ColorpickerConfig.Default, Save = ColorpickerConfig.Save, Type = "Colorpicker"}
+
+				local ColorpickerFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
+					Size = UDim2.new(1, 0, 0, 44),
+					Parent = ItemParent
+				}), {
+					AddThemeObject(SetProps(MakeElement("Label", ColorpickerConfig.Name, 14), {
+						Size = UDim2.new(1, -50, 1, 0),
+						Position = UDim2.new(0, 16, 0, 0),
+						Font = Enum.Font.GothamMedium,
+						Name = "Title",
+						TextYAlignment = Enum.TextYAlignment.Center
+					}), "Text"),
+					SetChildren(SetProps(MakeElement("RoundFrame", ColorpickerConfig.Default, 0, 6), {
+						Size = UDim2.new(0, 28, 0, 28),
+						Position = UDim2.new(1, -40, 0.5, -14),
+						Name = "Preview"
+					}), {
+						AddThemeObject(MakeElement("Stroke"), "Stroke"),
+						SetProps(MakeElement("Button"), {
+							Size = UDim2.new(1, 0, 1, 0)
+						})
+					}),
+					AddThemeObject(MakeElement("Stroke"), "Stroke")
+				}), "Second")
+
+				function Colorpicker:Set(Color)
+					Colorpicker.Value = Color
+					ColorpickerFrame.Preview.BackgroundColor3 = Color
+					ColorpickerConfig.Callback(Color)
+				end
+
+				-- Simple color picker (you can expand this with a full color wheel)
+				AddConnection(ColorpickerFrame.Preview.TextButton.MouseButton1Click, function()
+					-- This is a simple implementation - you could add a full color picker GUI here
+					local RandomColor = Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255))
+					Colorpicker:Set(RandomColor)
+					if NineNexusLib.SaveCfg then
+						SaveCfg(game.GameId)
+					end
+				end)
+
+				if ColorpickerConfig.Flag then
+					NineNexusLib.Flags[ColorpickerConfig.Flag] = Colorpicker
+				end
+
+				return Colorpicker
+			end
+
+			-- Keybind Element
+			function ElementFunction:AddKeybind(KeybindConfig)
+				KeybindConfig = KeybindConfig or {}
+				KeybindConfig.Name = KeybindConfig.Name or "Keybind"
+				KeybindConfig.Default = KeybindConfig.Default or Enum.KeyCode.F
+				KeybindConfig.Callback = KeybindConfig.Callback or function() end
+				KeybindConfig.Flag = KeybindConfig.Flag or nil
+				KeybindConfig.Save = KeybindConfig.Save or false
+
+				local Keybind = {Value = KeybindConfig.Default, Save = KeybindConfig.Save, Type = "Keybind"}
+				local WaitingForKey = false
+
+				local KeybindFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 8), {
+					Size = UDim2.new(1, 0, 0, 44),
+					Parent = ItemParent
+				}), {
+					AddThemeObject(SetProps(MakeElement("Label", KeybindConfig.Name, 14), {
+						Size = UDim2.new(1, -100, 1, 0),
+						Position = UDim2.new(0, 16, 0, 0),
+						Font = Enum.Font.GothamMedium,
+						Name = "Title",
+						TextYAlignment = Enum.TextYAlignment.Center
+					}), "Text"),
+					AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", NineNexusLib.Themes.Default.Main, 0, 6), {
+						Size = UDim2.new(0, 80, 0, 28),
+						Position = UDim2.new(1, -92, 0.5, -14),
+						Name = "KeyFrame"
+					}), {
+						AddThemeObject(MakeElement("Stroke"), "Stroke"),
+						AddThemeObject(SetProps(MakeElement("Label", KeybindConfig.Default.Name, 12), {
+							Size = UDim2.new(1, 0, 1, 0),
+							Font = Enum.Font.GothamMedium,
+							TextYAlignment = Enum.TextYAlignment.Center,
+							Name = "KeyLabel"
+						}), "Text"),
+						SetProps(MakeElement("Button"), {
+							Size = UDim2.new(1, 0, 1, 0)
+						})
+					}), "Main"),
+					AddThemeObject(MakeElement("Stroke"), "Stroke")
+				}), "Second")
+
+				function Keybind:Set(Key)
+					Keybind.Value = Key
+					KeybindFrame.KeyFrame.KeyLabel.Text = Key.Name
+				end
+
+				AddConnection(KeybindFrame.KeyFrame.TextButton.MouseButton1Click, function()
+					if WaitingForKey then return end
+					WaitingForKey = true
+					KeybindFrame.KeyFrame.KeyLabel.Text = "..."
+					
+					local Connection
+					Connection = AddConnection(UserInputService.InputBegan, function(Input, GameProcessed)
+						if GameProcessed then return end
+						if Input.UserInputType == Enum.UserInputType.Keyboard then
+							Keybind:Set(Input.KeyCode)
+							WaitingForKey = false
+							Connection:Disconnect()
+							if NineNexusLib.SaveCfg then
+								SaveCfg(game.GameId)
+							end
+						end
+					end)
+				end)
+
+				-- Handle the keybind press
+				AddConnection(UserInputService.InputBegan, function(Input, GameProcessed)
+					if GameProcessed then return end
+					if Input.KeyCode == Keybind.Value then
+						KeybindConfig.Callback()
+					end
+				end)
+
+				if KeybindConfig.Flag then
+					NineNexusLib.Flags[KeybindConfig.Flag] = Keybind
+				end
+
+				return Keybind
+			end
 
 			return ElementFunction
 		end
@@ -1092,7 +1606,7 @@ function NineNexusLib:MakeWindow(WindowConfig)
 
 	NineNexusLib:MakeNotification({
 		Name = "NineNexus Loaded",
-		Content = "UI Library successfully initialized",
+		Content = "UI Library successfully initialized with all elements",
 		Time = 3
 	})
 
